@@ -38,22 +38,32 @@ import (
 
 //go:generate go run github.com/fjl/gencodec -type header -field-override headerMarshaling -out gen_header.go
 type header struct {
-	ParentHash  common.Hash       `json:"parentHash"`
-	OmmerHash   *common.Hash      `json:"sha3Uncles"`
-	Coinbase    *common.Address   `json:"miner"`
-	Root        common.Hash       `json:"stateRoot"        gencodec:"required"`
-	TxHash      *common.Hash      `json:"transactionsRoot"`
-	ReceiptHash *common.Hash      `json:"receiptsRoot"`
-	Bloom       types.Bloom       `json:"logsBloom"`
-	Difficulty  *big.Int          `json:"difficulty"`
-	Number      *big.Int          `json:"number"           gencodec:"required"`
-	GasLimit    uint64            `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64            `json:"gasUsed"`
-	Time        uint64            `json:"timestamp"        gencodec:"required"`
-	Extra       []byte            `json:"extraData"`
-	MixDigest   common.Hash       `json:"mixHash"`
-	Nonce       *types.BlockNonce `json:"nonce"`
-	BaseFee     *big.Int          `json:"baseFeePerGas" rlp:"optional"`
+	ParentHash common.Hash  `json:"parentHash"`
+	OmmerHash  *common.Hash `json:"sha3Uncles"`
+	// 不同共识算法作用不一样
+	// ethash: 放出块者的地址
+	// clique: 保存投票时被投票人的地址，出块者的地址通过签名数据计算得出(ecrecover)。
+	Coinbase    *common.Address `json:"miner"`
+	Root        common.Hash     `json:"stateRoot"        gencodec:"required"`
+	TxHash      *common.Hash    `json:"transactionsRoot"`
+	ReceiptHash *common.Hash    `json:"receiptsRoot"`
+	Bloom       types.Bloom     `json:"logsBloom"`
+	Difficulty  *big.Int        `json:"difficulty"`
+	Number      *big.Int        `json:"number"           gencodec:"required"`
+	GasLimit    uint64          `json:"gasLimit"         gencodec:"required"`
+	GasUsed     uint64          `json:"gasUsed"`
+	Time        uint64          `json:"timestamp"        gencodec:"required"`
+	// clique中除了vanity数据和seal数据，还在checkpoint中保存所有签名者地址数据，结构为:
+	//    vanity_data  |  signer1_address | ... | signerN_address | seal_data
+	//        32byte   |               ................           |   65byte
+	Extra     []byte      `json:"extraData"`
+	MixDigest common.Hash `json:"mixHash"`
+	// 不同共识算法作用不一样
+	// ethash: 用作一个变量调整Header的哈希，在bitcoin中有类似变量
+	// clique: 用于保存投票的目的，nonceAuthVote(0xffffffffffffffff)表示授权投票
+	//                           nonceDropVote(0x0000000000000000)表示踢出投票
+	Nonce   *types.BlockNonce `json:"nonce"`
+	BaseFee *big.Int          `json:"baseFeePerGas" rlp:"optional"`
 }
 
 type headerMarshaling struct {
