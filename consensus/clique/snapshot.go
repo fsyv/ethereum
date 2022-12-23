@@ -33,33 +33,50 @@ import (
 
 // Vote represents a single vote that an authorized signer made to modify the
 // list of authorizations.
+// 投票的数据结构
 type Vote struct {
-	Signer    common.Address `json:"signer"`    // Authorized signer that cast this vote
-	Block     uint64         `json:"block"`     // Block number the vote was cast in (expire old votes)
-	Address   common.Address `json:"address"`   // Account being voted on to change its authorization
-	Authorize bool           `json:"authorize"` // Whether to authorize or deauthorize the voted account
+	// 此次投票是谁投的
+	Signer common.Address `json:"signer"` // Authorized signer that cast this vote
+	// 本次投票给哪一个区块的
+	Block uint64 `json:"block"` // Block number the vote was cast in (expire old votes)
+	// 此次投票投给谁
+	Address common.Address `json:"address"` // Account being voted on to change its authorization
+	// 投票的类型
+	// authorize: 加入票（申请被投人成为签名者）
+	// deauthorize: 踢出票（申请将被投人踢出签名者列表）
+	Authorize bool `json:"authorize"` // Whether to authorize or deauthorize the voted account
 }
 
 // Tally is a simple vote tally to keep the current score of votes. Votes that
 // go against the proposal aren't counted since it's equivalent to not voting.
+// 统计投票信息
 type Tally struct {
+	// 当前是加入票还是提出投票，如果是true则表示加入票，false为踢出票
 	Authorize bool `json:"authorize"` // Whether the vote is about authorizing or kicking someone
-	Votes     int  `json:"votes"`     // Number of votes until now wanting to pass the proposal
+	// 累计的票数
+	Votes int `json:"votes"` // Number of votes until now wanting to pass the proposal
 }
 
 type sigLRU = lru.Cache[common.Hash, common.Address]
 
 // Snapshot is the state of the authorization voting at a given point in time.
+// Snapshot对象是clique中比较重要的一个对象，统计并保存链的某段高度区间的投票信息和签名者列表。
+// 这个统计区间是从某个checkpoint开始（包括genesis block），到某个更高高度的block。
+// 在Snapshot对象中用到了两个重要的结构体：Vote和Tally。
 type Snapshot struct {
 	config   *params.CliqueConfig // Consensus engine parameters to fine tune behavior
 	sigcache *sigLRU              // Cache of recent block signatures to speed up ecrecover
 
-	Number  uint64                      `json:"number"`  // Block number where the snapshot was created
-	Hash    common.Hash                 `json:"hash"`    // Block hash where the snapshot was created
+	Number uint64      `json:"number"` // Block number where the snapshot was created
+	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
+	// 当前所有的有效签名者
 	Signers map[common.Address]struct{} `json:"signers"` // Set of authorized signers at this moment
-	Recents map[uint64]common.Address   `json:"recents"` // Set of recent signers for spam protections
-	Votes   []*Vote                     `json:"votes"`   // List of votes cast in chronological order
-	Tally   map[common.Address]Tally    `json:"tally"`   // Current vote tally to avoid recalculating
+	// 保存最近(最新的len(Snapshot.Signers)/2 + 1个块)出块的签名者和所出的块的高度。其中map的key是生成的block的高度。
+	Recents map[uint64]common.Address `json:"recents"` // Set of recent signers for spam protections
+	// 按时间先后顺序保存的投票信息
+	Votes []*Vote `json:"votes"` // List of votes cast in chronological order
+	// 目前为止累计各被投人的票数
+	Tally map[common.Address]Tally `json:"tally"` // Current vote tally to avoid recalculating
 }
 
 // signersAscending implements the sort interface to allow sorting a list of addresses
@@ -208,13 +225,21 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 	)
 	for i, header := range headers {
 		// Remove any votes on checkpoint blocks
+		// 区块的序号
 		number := header.Number.Uint64()
+		// 如果当前header的高度是epoch的整数倍（当前block是一个checkpoint），则清除所有投票信息和统计
+		// Votes和Tally字段的详细信息参看对Snapshot的介绍。
 		if number%s.config.Epoch == 0 {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 		}
 		// Delete the oldest signer from the recent list to allow it signing again
+		// 将高度与当前块相差limit的块从Recents中删除掉
 		if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
+			// TODO Q: 为什么是删除number-limit?
+			// A: 比如目前有6个签名者，当前块的高度是10，那么高度为”10 - (6/2 + 1) = 6”的块将从Recents中删除，
+			// 然后将高度为10的块和其签名者加入Recents中；处理一下个块即高度为11时，
+			// 高度为7的块又会从Recents中删除，然后高度为11的块会被加入。
 			delete(snap.Recents, number-limit)
 		}
 		// Resolve the authorization key and check against signers
@@ -230,9 +255,12 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				return nil, errRecentlySigned
 			}
 		}
+		// 将当前块的高度和签名者加入Recents中
 		snap.Recents[number] = signer
 
 		// Header authorized, discard any previous votes from the signer
+		// 如果当前的投票人已经给某人投过票，则清除之前的投票信息
+		// 这保证了一个epoch内一个signer只能给某人投一次票，或用来撤消投票
 		for i, vote := range snap.Votes {
 			if vote.Signer == signer && vote.Address == header.Coinbase {
 				// Uncast the vote from the cached tally
@@ -244,6 +272,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			}
 		}
 		// Tally up the new vote from the signer
+		// 将本次的投票信息纳入统计
 		var authorize bool
 		switch {
 		case bytes.Equal(header.Nonce[:], nonceAuthVote):
@@ -262,17 +291,23 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			})
 		}
 		// If the vote passed, update the list of signers
+		// 如果累计投票数超过一半
 		if tally := snap.Tally[header.Coinbase]; tally.Votes > len(snap.Signers)/2 {
 			if tally.Authorize {
+				// 如果是加入票，则将被投人加入到Signers列表中
+				// 之后此人就可以出块了
 				snap.Signers[header.Coinbase] = struct{}{}
 			} else {
+				// 如果是踢出票，则把被投人从Signers中删除
 				delete(snap.Signers, header.Coinbase)
 
 				// Signer list shrunk, delete any leftover recent caches
+				// 将被投人从Recents信息中删除
 				if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
 					delete(snap.Recents, number-limit)
 				}
 				// Discard any previous votes the deauthorized signer cast
+				// 丢弃被投人之前投出的所有投票
 				for i := 0; i < len(snap.Votes); i++ {
 					if snap.Votes[i].Signer == header.Coinbase {
 						// Uncast the vote from the cached tally
@@ -286,12 +321,14 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				}
 			}
 			// Discard any previous votes around the just changed account
+			// 清除所有被投人是当前生效人的投票信息
 			for i := 0; i < len(snap.Votes); i++ {
 				if snap.Votes[i].Address == header.Coinbase {
 					snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
 					i--
 				}
 			}
+			//清空当前生效人的票数统计信息
 			delete(snap.Tally, header.Coinbase)
 		}
 		// If we're taking too much time (ecrecover), notify the user once a while

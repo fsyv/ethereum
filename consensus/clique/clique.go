@@ -176,6 +176,7 @@ type Clique struct {
 	recents    *lru.Cache[common.Hash, *Snapshot] // Snapshots for recent block to speed up reorgs
 	signatures *sigLRU                            // Signatures of recent blocks to speed up mining
 
+	// 存储投票信息
 	proposals map[common.Address]bool // Current list of proposals we are pushing
 
 	signer common.Address // Ethereum address of the signing key
@@ -367,6 +368,10 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 
 // snapshot retrieves the authorization snapshot at a given point in time.
 func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
+	// Snapshot的创建分两步：一是在某个checkpoint(包括genesis block)上调用newSnapshot生成一个Snapshot对象，
+	// 然后调用这个对象的apply方法。这两步被封装在了Clique.snapshot方法中，
+	// 即Clique.snapshot才是正确生成Snapshot对象的方法。
+
 	// Search for a snapshot in memory or on disk for checkpoints
 	var (
 		headers []*types.Header
@@ -374,12 +379,15 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 	)
 	for snap == nil {
 		// If an in-memory snapshot was found, use that
+		// 首先从缓存(内存)中查找
 		if s, ok := c.recents.Get(hash); ok {
 			snap = s
 			break
 		}
 		// If an on-disk checkpoint snapshot can be found, use that
+		// 缓存(内存)没有找到，再从数据库中查找
 		if number%checkpointInterval == 0 {
+			// 从数据库中加载
 			if s, err := loadSnapshot(c.config, c.signatures, c.db, hash); err == nil {
 				log.Trace("Loaded voting snapshot from disk", "number", number, "hash", hash)
 				snap = s
@@ -390,16 +398,21 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		// at a checkpoint block without a parent (light client CHT), or we have piled
 		// up more headers than allowed to be reorged (chain reinit from a freezer),
 		// consider the checkpoint trusted and snapshot it.
+		// 既不在缓存中也不在数据库中，那么看是否是创世块或没有父块的checkpoint
 		if number == 0 || (number%c.config.Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
 				hash := checkpoint.Hash()
 
+				// 从checkpoint中取出signers列表
 				signers := make([]common.Address, (len(checkpoint.Extra)-extraVanity-extraSeal)/common.AddressLength)
 				for i := 0; i < len(signers); i++ {
 					copy(signers[i][:], checkpoint.Extra[extraVanity+i*common.AddressLength:])
 				}
+
+				// 调用newSnapshot在checkpoint上创建Snapshot对象，并将其存入数据库中
 				snap = newSnapshot(c.config, c.signatures, number, hash, signers)
+				// 存入数据库中
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -408,6 +421,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 			}
 		}
 		// No snapshot for this header, gather the header and move backward
+		// 如果以上情况都不是，则往前回溯区块的链，并保存回溯过程中遇到的header
 		var header *types.Header
 		if len(parents) > 0 {
 			// If we have explicit parents, pick from there (enforced)
@@ -430,6 +444,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 	for i := 0; i < len(headers)/2; i++ {
 		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
 	}
+	// 将回溯中遇到的headers传给apply方法，得到一个新的snap对象
 	snap, err := snap.apply(headers)
 	if err != nil {
 		return nil, err
@@ -501,6 +516,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
 
+	// 即将生成区块的高度
 	number := header.Number.Uint64()
 	// Assemble the voting snapshot to check which votes make sense
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
@@ -508,6 +524,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		return err
 	}
 	c.lock.RLock()
+	// 如果number不是epoch的整数倍（不是checkpoint），则进行投票信息的填充
 	if number%c.config.Epoch != 0 {
 		// Gather all the proposals that make sense voting on
 		addresses := make([]common.Address, 0, len(c.proposals))
@@ -517,8 +534,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 			}
 		}
 		// If there's pending proposals, cast a vote on them
+		// 填写投票信息（投票信息存储在Coinbase和Nonce字段中）
 		if len(addresses) > 0 {
 			header.Coinbase = addresses[rand.Intn(len(addresses))]
+			// 如果确实有有意义的被投地址，随机选一个填入Header中
 			if c.proposals[header.Coinbase] {
 				copy(header.Nonce[:], nonceAuthVote)
 			} else {
@@ -532,6 +551,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	c.lock.RUnlock()
 
 	// Set the correct difficulty
+	// 这里计算是inturn还是noturn
 	header.Difficulty = calcDifficulty(snap, signer)
 
 	// Ensure the extra data has all its components
@@ -540,6 +560,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	}
 	header.Extra = header.Extra[:extraVanity]
 
+	// 如果number是epoch的整数倍（将要生成一个checkpoint），则填充签名者列表
 	if number%c.config.Epoch == 0 {
 		for _, signer := range snap.signers() {
 			header.Extra = append(header.Extra, signer[:]...)
@@ -618,18 +639,26 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 		return errUnauthorizedSigner
 	}
 	// If we're amongst the recent signers, wait for the next block
+	// snap.Recents: 保存的就是最近出的块的高度和块的签名者（signer）
+	// seen 是签名者以前出块的块高
+	// recent 是这个块的签名者
 	for seen, recent := range snap.Recents {
+		// 如果当前的签名者刚出过块（在Recents中），并且这个历史块的高度离新出块的高度相差在所有签名者数量的一半（严格来说是一半加1）以内，则不允许再出块
 		if recent == signer {
 			// Signer is among recents, only wait if the current block doesn't shift it out
+			// 在准备为新的block签名时，会判断当前的签名者是不是在Recents中，如果在则不再签名.
+			// TODO 为啥number < limit？ 如果number = 1，不会有bug ？
 			if limit := uint64(len(snap.Signers)/2 + 1); number < limit || seen > number-limit {
 				return errors.New("signed recently, must wait for others")
 			}
 		}
 	}
 	// Sweet, the protocol permits us to sign the block, wait for our time
+	// 计算正常的等待出块时间
 	delay := time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
 	if header.Difficulty.Cmp(diffNoTurn) == 0 {
 		// It's not our turn explicitly to sign, delay it a bit
+		// 没有轮到我们出块，多等一会
 		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
 		delay += time.Duration(rand.Int63n(int64(wiggle)))
 
