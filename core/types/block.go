@@ -86,6 +86,8 @@ type Header struct {
 	// clique中除了vanity数据和seal数据，还在checkpoint中保存所有签名者地址数据，结构为:
 	//    vanity_data  |  signer1_address | ... | signerN_address | seal_data
 	//        32byte   |               ................           |   65byte
+	// 普通块中为32字节空前缀+65字节当前区块出块者对区块头部的签名；
+	// CHECKPOINT块这个字节为32字节空前缀+所有签名者地址列表+65字节当前区块出块者对区块头部的签名
 	Extra     []byte      `json:"extraData"        gencodec:"required"`
 	MixDigest common.Hash `json:"mixHash"`
 	// 不同共识算法作用不一样
