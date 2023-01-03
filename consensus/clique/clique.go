@@ -367,7 +367,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
-func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
+func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, parentHash common.Hash, parents []*types.Header) (*Snapshot, error) {
 	// Snapshot的创建分两步：一是在某个checkpoint(包括genesis block)上调用newSnapshot生成一个Snapshot对象，
 	// 然后调用这个对象的apply方法。这两步被封装在了Clique.snapshot方法中，
 	// 即Clique.snapshot才是正确生成Snapshot对象的方法。
@@ -380,7 +380,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 	for snap == nil {
 		// If an in-memory snapshot was found, use that
 		// 首先从缓存(内存)中查找
-		if s, ok := c.recents.Get(hash); ok {
+		if s, ok := c.recents.Get(parentHash); ok {
 			snap = s
 			break
 		}
@@ -388,8 +388,8 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		// 缓存(内存)没有找到，再从数据库中查找
 		if number%checkpointInterval == 0 {
 			// 从数据库中加载
-			if s, err := loadSnapshot(c.config, c.signatures, c.db, hash); err == nil {
-				log.Trace("Loaded voting snapshot from disk", "number", number, "hash", hash)
+			if s, err := loadSnapshot(c.config, c.signatures, c.db, parentHash); err == nil {
+				log.Trace("Loaded voting snapshot from disk", "number", number, "parentHash", parentHash)
 				snap = s
 				break
 			}
@@ -416,7 +416,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
-				log.Info("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
+				log.Info("Stored checkpoint snapshot to disk", "number", number, "parentHash", hash)
 				break
 			}
 		}
@@ -426,19 +426,19 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		if len(parents) > 0 {
 			// If we have explicit parents, pick from there (enforced)
 			header = parents[len(parents)-1]
-			if header.Hash() != hash || header.Number.Uint64() != number {
+			if header.Hash() != parentHash || header.Number.Uint64() != number {
 				return nil, consensus.ErrUnknownAncestor
 			}
 			parents = parents[:len(parents)-1]
 		} else {
 			// No explicit parents (or no more left), reach out to the database
-			header = chain.GetHeader(hash, number)
+			header = chain.GetHeader(parentHash, number)
 			if header == nil {
 				return nil, consensus.ErrUnknownAncestor
 			}
 		}
 		headers = append(headers, header)
-		number, hash = number-1, header.ParentHash
+		number, parentHash = number-1, header.ParentHash
 	}
 	// Previous snapshot found, apply any pending headers on top of it
 	for i := 0; i < len(headers)/2; i++ {
@@ -456,7 +456,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		if err = snap.store(c.db); err != nil {
 			return nil, err
 		}
-		log.Trace("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+		log.Trace("Stored voting snapshot to disk", "number", snap.Number, "parentHash", snap.Hash)
 	}
 	return snap, err
 }
@@ -552,6 +552,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 
 	// Set the correct difficulty
 	// 这里计算是inturn还是noturn
+	// TODO：这儿是不是被攻击？
 	header.Difficulty = calcDifficulty(snap, signer)
 
 	// Ensure the extra data has all its components
@@ -586,6 +587,12 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 // Finalize implements consensus.Engine, ensuring no uncles are set, nor block
 // rewards given.
 func (c *Clique) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
+
+	// 对于出块者，给予1信用的奖励
+	reward := big.NewInt(1)
+	state.AddBalance(c.signer, reward)
+	log.Info("信用查询", "用户", c.signer, "信用值", state.GetBalance(c.signer))
+
 	// No block rewards in PoA, so the state remains as is and uncles are dropped
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)

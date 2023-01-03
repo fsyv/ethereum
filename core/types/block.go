@@ -78,11 +78,12 @@ type Header struct {
 	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
 	Bloom       Bloom          `json:"logsBloom"        gencodec:"required"`
-	Difficulty  *big.Int       `json:"difficulty"       gencodec:"required"`
-	Number      *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
-	Time        uint64         `json:"timestamp"        gencodec:"required"`
+	// clique: 表示inturn或者noturn
+	Difficulty *big.Int `json:"difficulty"       gencodec:"required"`
+	Number     *big.Int `json:"number"           gencodec:"required"`
+	GasLimit   uint64   `json:"gasLimit"         gencodec:"required"`
+	GasUsed    uint64   `json:"gasUsed"          gencodec:"required"`
+	Time       uint64   `json:"timestamp"        gencodec:"required"`
 	// clique中除了vanity数据和seal数据，还在checkpoint中保存所有签名者地址数据，结构为:
 	//    vanity_data  |  signer1_address | ... | signerN_address | seal_data
 	//        32byte   |               ................           |   65byte
