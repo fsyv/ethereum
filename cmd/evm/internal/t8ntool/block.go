@@ -38,32 +38,33 @@ import (
 
 //go:generate go run github.com/fjl/gencodec -type header -field-override headerMarshaling -out gen_header.go
 type header struct {
-	ParentHash common.Hash  `json:"parentHash"`
-	OmmerHash  *common.Hash `json:"sha3Uncles"`
+	ParentHash      common.Hash       `json:"parentHash"`
+	OmmerHash       *common.Hash      `json:"sha3Uncles"`
 	// 不同共识算法作用不一样
 	// ethash: 放出块者的地址
 	// clique: 保存投票时被投票人的地址，出块者的地址通过签名数据计算得出(ecrecover)。
-	Coinbase    *common.Address `json:"miner"`
-	Root        common.Hash     `json:"stateRoot"        gencodec:"required"`
-	TxHash      *common.Hash    `json:"transactionsRoot"`
-	ReceiptHash *common.Hash    `json:"receiptsRoot"`
-	Bloom       types.Bloom     `json:"logsBloom"`
-	Difficulty  *big.Int        `json:"difficulty"`
-	Number      *big.Int        `json:"number"           gencodec:"required"`
-	GasLimit    uint64          `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64          `json:"gasUsed"`
-	Time        uint64          `json:"timestamp"        gencodec:"required"`
+	Coinbase        *common.Address   `json:"miner"`
+	Root            common.Hash       `json:"stateRoot"        gencodec:"required"`
+	TxHash          *common.Hash      `json:"transactionsRoot"`
+	ReceiptHash     *common.Hash      `json:"receiptsRoot"`
+	Bloom           types.Bloom       `json:"logsBloom"`
+	Difficulty      *big.Int          `json:"difficulty"`
+	Number          *big.Int          `json:"number"           gencodec:"required"`
+	GasLimit        uint64            `json:"gasLimit"         gencodec:"required"`
+	GasUsed         uint64            `json:"gasUsed"`
+	Time            uint64            `json:"timestamp"        gencodec:"required"`
 	// clique中除了vanity数据和seal数据，还在checkpoint中保存所有签名者地址数据，结构为:
 	//    vanity_data  |  signer1_address | ... | signerN_address | seal_data
 	//        32byte   |               ................           |   65byte
-	Extra     []byte      `json:"extraData"`
-	MixDigest common.Hash `json:"mixHash"`
+	Extra           []byte            `json:"extraData"`
+	MixDigest       common.Hash       `json:"mixHash"`
 	// 不同共识算法作用不一样
 	// ethash: 用作一个变量调整Header的哈希，在bitcoin中有类似变量
 	// clique: 用于保存投票的目的，nonceAuthVote(0xffffffffffffffff)表示授权投票
 	//                           nonceDropVote(0x0000000000000000)表示踢出投票
-	Nonce   *types.BlockNonce `json:"nonce"`
-	BaseFee *big.Int          `json:"baseFeePerGas" rlp:"optional"`
+	Nonce           *types.BlockNonce `json:"nonce"`
+	BaseFee         *big.Int          `json:"baseFeePerGas" rlp:"optional"`
+	WithdrawalsHash *common.Hash      `json:"withdrawalsRoot" rlp:"optional"`
 }
 
 type headerMarshaling struct {
@@ -77,10 +78,11 @@ type headerMarshaling struct {
 }
 
 type bbInput struct {
-	Header    *header      `json:"header,omitempty"`
-	OmmersRlp []string     `json:"ommers,omitempty"`
-	TxRlp     string       `json:"txs,omitempty"`
-	Clique    *cliqueInput `json:"clique,omitempty"`
+	Header      *header             `json:"header,omitempty"`
+	OmmersRlp   []string            `json:"ommers,omitempty"`
+	TxRlp       string              `json:"txs,omitempty"`
+	Withdrawals []*types.Withdrawal `json:"withdrawals,omitempty"`
+	Clique      *cliqueInput        `json:"clique,omitempty"`
 
 	Ethash    bool                 `json:"-"`
 	EthashDir string               `json:"-"`
@@ -124,21 +126,22 @@ func (c *cliqueInput) UnmarshalJSON(input []byte) error {
 // ToBlock converts i into a *types.Block
 func (i *bbInput) ToBlock() *types.Block {
 	header := &types.Header{
-		ParentHash:  i.Header.ParentHash,
-		UncleHash:   types.EmptyUncleHash,
-		Coinbase:    common.Address{},
-		Root:        i.Header.Root,
-		TxHash:      types.EmptyRootHash,
-		ReceiptHash: types.EmptyRootHash,
-		Bloom:       i.Header.Bloom,
-		Difficulty:  common.Big0,
-		Number:      i.Header.Number,
-		GasLimit:    i.Header.GasLimit,
-		GasUsed:     i.Header.GasUsed,
-		Time:        i.Header.Time,
-		Extra:       i.Header.Extra,
-		MixDigest:   i.Header.MixDigest,
-		BaseFee:     i.Header.BaseFee,
+		ParentHash:      i.Header.ParentHash,
+		UncleHash:       types.EmptyUncleHash,
+		Coinbase:        common.Address{},
+		Root:            i.Header.Root,
+		TxHash:          types.EmptyRootHash,
+		ReceiptHash:     types.EmptyRootHash,
+		Bloom:           i.Header.Bloom,
+		Difficulty:      common.Big0,
+		Number:          i.Header.Number,
+		GasLimit:        i.Header.GasLimit,
+		GasUsed:         i.Header.GasUsed,
+		Time:            i.Header.Time,
+		Extra:           i.Header.Extra,
+		MixDigest:       i.Header.MixDigest,
+		BaseFee:         i.Header.BaseFee,
+		WithdrawalsHash: i.Header.WithdrawalsHash,
 	}
 
 	// Fill optional values.
@@ -163,7 +166,7 @@ func (i *bbInput) ToBlock() *types.Block {
 	if header.Difficulty != nil {
 		header.Difficulty = i.Header.Difficulty
 	}
-	return types.NewBlockWithHeader(header).WithBody(i.Txs, i.Ommers)
+	return types.NewBlockWithHeader(header).WithBody(i.Txs, i.Ommers).WithWithdrawals(i.Withdrawals)
 }
 
 // SealBlock seals the given block using the configured engine.
@@ -269,14 +272,15 @@ func BuildBlock(ctx *cli.Context) error {
 
 func readInput(ctx *cli.Context) (*bbInput, error) {
 	var (
-		headerStr  = ctx.String(InputHeaderFlag.Name)
-		ommersStr  = ctx.String(InputOmmersFlag.Name)
-		txsStr     = ctx.String(InputTxsRlpFlag.Name)
-		cliqueStr  = ctx.String(SealCliqueFlag.Name)
-		ethashOn   = ctx.Bool(SealEthashFlag.Name)
-		ethashDir  = ctx.String(SealEthashDirFlag.Name)
-		ethashMode = ctx.String(SealEthashModeFlag.Name)
-		inputData  = &bbInput{}
+		headerStr      = ctx.String(InputHeaderFlag.Name)
+		ommersStr      = ctx.String(InputOmmersFlag.Name)
+		withdrawalsStr = ctx.String(InputWithdrawalsFlag.Name)
+		txsStr         = ctx.String(InputTxsRlpFlag.Name)
+		cliqueStr      = ctx.String(SealCliqueFlag.Name)
+		ethashOn       = ctx.Bool(SealEthashFlag.Name)
+		ethashDir      = ctx.String(SealEthashDirFlag.Name)
+		ethashMode     = ctx.String(SealEthashModeFlag.Name)
+		inputData      = &bbInput{}
 	)
 	if ethashOn && cliqueStr != "" {
 		return nil, NewError(ErrorConfig, fmt.Errorf("both ethash and clique sealing specified, only one may be chosen"))
@@ -322,6 +326,13 @@ func readInput(ctx *cli.Context) (*bbInput, error) {
 		}
 		inputData.OmmersRlp = ommers
 	}
+	if withdrawalsStr != stdinSelector && withdrawalsStr != "" {
+		var withdrawals []*types.Withdrawal
+		if err := readFile(withdrawalsStr, "withdrawals", &withdrawals); err != nil {
+			return nil, err
+		}
+		inputData.Withdrawals = withdrawals
+	}
 	if txsStr != stdinSelector {
 		var txs string
 		if err := readFile(txsStr, "txs", &txs); err != nil {
@@ -361,15 +372,14 @@ func readInput(ctx *cli.Context) (*bbInput, error) {
 // files
 func dispatchBlock(ctx *cli.Context, baseDir string, block *types.Block) error {
 	raw, _ := rlp.EncodeToBytes(block)
-
 	type blockInfo struct {
 		Rlp  hexutil.Bytes `json:"rlp"`
 		Hash common.Hash   `json:"hash"`
 	}
-	var enc blockInfo
-	enc.Rlp = raw
-	enc.Hash = block.Hash()
-
+	enc := blockInfo{
+		Rlp:  raw,
+		Hash: block.Hash(),
+	}
 	b, err := json.MarshalIndent(enc, "", "  ")
 	if err != nil {
 		return NewError(ErrorJson, fmt.Errorf("failed marshalling output: %v", err))

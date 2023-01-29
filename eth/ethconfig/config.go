@@ -18,7 +18,6 @@
 package ethconfig
 
 import (
-	"math/big"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -206,11 +205,8 @@ type Config struct {
 	// CheckpointOracle is the configuration for checkpoint oracle.
 	CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
 
-	// OverrideTerminalTotalDifficulty (TODO: remove after the fork)
-	OverrideTerminalTotalDifficulty *big.Int `toml:",omitempty"`
-
-	// OverrideTerminalTotalDifficultyPassed (TODO: remove after the fork)
-	OverrideTerminalTotalDifficultyPassed *bool `toml:",omitempty"`
+	// OverrideShanghai (TODO: remove after the fork)
+	OverrideShanghai *uint64 `toml:",omitempty"`
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.

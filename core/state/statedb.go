@@ -442,9 +442,15 @@ func (s *StateDB) SetState(addr common.Address, key, value common.Hash) {
 // SetStorage replaces the entire storage for the specified account with given
 // storage. This function should only be used for debugging.
 func (s *StateDB) SetStorage(addr common.Address, storage map[common.Hash]common.Hash) {
+	// SetStorage needs to wipe existing storage. We achieve this by pretending
+	// that the account self-destructed earlier in this block, by flagging
+	// it in stateObjectsDestruct. The effect of doing so is that storage lookups
+	// will not hit disk, since it is assumed that the disk-data is belonging
+	// to a previous incarnation of the object.
+	s.stateObjectsDestruct[addr] = struct{}{}
 	stateObject := s.GetOrNewStateObject(addr)
-	if stateObject != nil {
-		stateObject.SetStorage(storage)
+	for k, v := range storage {
+		stateObject.SetState(s.db, k, v)
 	}
 }
 
@@ -510,7 +516,7 @@ func (s *StateDB) updateStateObject(obj *stateObject) {
 	}
 	// Encode the account and update the account trie
 	addr := obj.Address()
-	if err := s.trie.TryUpdateAccount(addr[:], &obj.data); err != nil {
+	if err := s.trie.TryUpdateAccount(addr, &obj.data); err != nil {
 		s.setError(fmt.Errorf("updateStateObject (%x) error: %v", addr[:], err))
 	}
 
@@ -531,7 +537,7 @@ func (s *StateDB) deleteStateObject(obj *stateObject) {
 	}
 	// Delete the account from the trie
 	addr := obj.Address()
-	if err := s.trie.TryDeleteAccount(addr[:]); err != nil {
+	if err := s.trie.TryDeleteAccount(addr); err != nil {
 		s.setError(fmt.Errorf("deleteStateObject (%x) error: %v", addr[:], err))
 	}
 }
@@ -585,7 +591,7 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 	if data == nil {
 		start := time.Now()
 		var err error
-		data, err = s.trie.TryGetAccount(addr.Bytes())
+		data, err = s.trie.TryGetAccount(addr)
 		if metrics.EnabledExpensive {
 			s.AccountReads += time.Since(start)
 		}

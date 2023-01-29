@@ -269,8 +269,7 @@ func (e *GenesisMismatchError) Error() string {
 
 // ChainOverrides contains the changes to chain config.
 type ChainOverrides struct {
-	OverrideTerminalTotalDifficulty       *big.Int
-	OverrideTerminalTotalDifficultyPassed *bool
+	OverrideShanghai *uint64
 }
 
 // SetupGenesisBlock writes or updates the genesis block in db.
@@ -296,15 +295,11 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 	}
 	applyOverrides := func(config *params.ChainConfig) {
 		if config != nil {
-			if overrides != nil && overrides.OverrideTerminalTotalDifficulty != nil {
-				config.TerminalTotalDifficulty = overrides.OverrideTerminalTotalDifficulty
-			}
-			if overrides != nil && overrides.OverrideTerminalTotalDifficultyPassed != nil {
-				config.TerminalTotalDifficultyPassed = *overrides.OverrideTerminalTotalDifficultyPassed
+			if overrides != nil && overrides.OverrideShanghai != nil {
+				config.ShanghaiTime = overrides.OverrideShanghai
 			}
 		}
 	}
-
 	// Just commit the new block if there is no stored genesis block.
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
@@ -371,12 +366,12 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 	}
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
-	height := rawdb.ReadHeaderNumber(db, rawdb.ReadHeadHeaderHash(db))
-	if height == nil {
-		return newcfg, stored, fmt.Errorf("missing block number for head header hash")
+	head := rawdb.ReadHeadHeader(db)
+	if head == nil {
+		return newcfg, stored, fmt.Errorf("missing head header")
 	}
-	compatErr := storedcfg.CheckCompatible(newcfg, *height)
-	if compatErr != nil && *height != 0 && compatErr.RewindTo != 0 {
+	compatErr := storedcfg.CheckCompatible(newcfg, head.Number.Uint64(), head.Time)
+	if compatErr != nil && ((head.Number.Uint64() != 0 && compatErr.RewindToBlock != 0) || (head.Time != 0 && compatErr.RewindToTime != 0)) {
 		return newcfg, stored, compatErr
 	}
 	// Don't overwrite if the old is identical to the new
@@ -436,8 +431,6 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.RinkebyChainConfig
 	case ghash == params.GoerliGenesisHash:
 		return params.GoerliChainConfig
-	case ghash == params.KilnGenesisHash:
-		return DefaultKilnGenesisBlock().Config
 	default:
 		return params.AllEthashProtocolChanges
 	}
@@ -475,6 +468,9 @@ func (g *Genesis) ToBlock() *types.Block {
 		} else {
 			head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
 		}
+	}
+	if g.Config != nil && g.Config.IsShanghai(g.Timestamp) {
+		head.WithdrawalsHash = &types.EmptyRootHash
 	}
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil))
 }
@@ -584,16 +580,6 @@ func DefaultSepoliaGenesisBlock() *Genesis {
 		Timestamp:  1633267481,
 		Alloc:      decodePrealloc(sepoliaAllocData),
 	}
-}
-
-// DefaultKilnGenesisBlock returns the kiln network genesis block.
-func DefaultKilnGenesisBlock() *Genesis {
-	g := new(Genesis)
-	reader := strings.NewReader(KilnAllocData)
-	if err := json.NewDecoder(reader).Decode(g); err != nil {
-		panic(err)
-	}
-	return g
 }
 
 // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
