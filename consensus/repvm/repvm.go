@@ -572,11 +572,6 @@ func (c *Repvm) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	// No block rewards in PoA, so the state remains as is and uncles are dropped
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
-
-	// TODO: 更新信誉值
-	//      1. 读取跟evaluation有关的智能合约？ 这个怎么找出
-	//      2. 获取里面的分数
-	//      3. 更新节点得分。
 }
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
@@ -691,7 +686,7 @@ func (c *Repvm) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 func calcDifficulty(snap *Snapshot, signer common.Address) *big.Int {
 
 	// TODO: 查询signer的信誉值，并返回
-	// 步骤： 1. 调用prestige智能合约
+	// 步骤： 1. 调用reputation.sol智能合约
 	//       2. 返回signer的信誉值
 
 	return nil

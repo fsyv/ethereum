@@ -7,7 +7,8 @@ pragma solidity >=0.7.0 <0.9.0;
 // 3. 信誉值修改(修改reputation.sol中的值)
 contract Evaluation {
     constructor(){
-
+        
+        // event -> 通知 reputation
     }
 
     // 评价目标账户

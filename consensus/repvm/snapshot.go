@@ -213,7 +213,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			// TODO: 更新Signers
 			//       1. 通过智能合约获取节点的信誉值, 计算出阈值
 			//       2. 信誉值大于阈值，进入Signers
-			//        待讨论: 是否主动广播自己的信誉值？
+			//        待讨论: 调用方法计算
 			//
 		}
 
