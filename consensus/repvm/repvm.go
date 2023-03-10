@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/reputation"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
@@ -137,6 +138,9 @@ var (
 	// errRecentlySigned is returned if a header is signed by an authorized entity
 	// that already signed a header recently, thus is temporarily not allowed to.
 	errRecentlySigned = errors.New("recently signed")
+
+	// errContract is returned if the contract call failed.
+	errContract = errors.New("contract call error")
 )
 
 // SignerFn hashes and signs the data to be signed by a backing account.
@@ -184,6 +188,8 @@ type Repvm struct {
 
 	// The fields below are for testing only
 	fakeDiff bool // Skip difficulty verifications
+
+	reputations *reputation.Reputations //访问智能合约
 }
 
 // New creates a Repvm proof-of-authority consensus engine with the initial
@@ -199,11 +205,12 @@ func New(config *params.RepvmConfig, db ethdb.Database) *Repvm {
 	signatures, _ := lru.NewARC(inmemorySignatures)
 
 	return &Repvm{
-		config:     &conf,
-		db:         db,
-		recents:    recents,
-		signatures: signatures,
-		proposals:  make(map[common.Address]bool),
+		config:      &conf,
+		db:          db,
+		recents:     recents,
+		signatures:  signatures,
+		proposals:   make(map[common.Address]bool),
+		reputations: reputation.NewReputations("test"),
 	}
 }
 
@@ -291,8 +298,9 @@ func (c *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 
 	// TODO: 难度的意义变更。不再与diffInTurn和diffNoTurn比较
 	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
+	// and cannot be a negative number
 	if number > 0 {
-		if header.Difficulty == nil || (header.Difficulty.Cmp(diffInTurn) != 0 && header.Difficulty.Cmp(diffNoTurn) != 0) {
+		if header.Difficulty == nil || header.Difficulty.Cmp(big.NewInt(0)) < 0 {
 			return errInvalidDifficulty
 		}
 	}
@@ -486,11 +494,13 @@ func (c *Repvm) verifySeal(snap *Snapshot, header *types.Header, parents []*type
 	// Ensure that the difficulty corresponds to the turn-ness of the signer
 	// TODO: 逻辑一样，不过变成检验难度是否和信誉值相同
 	if !c.fakeDiff {
-		inturn := snap.inturn(header.Number.Uint64(), signer)
-		if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
-			return errWrongDifficulty
+
+		rep, err := c.reputations.GetReputation(signer)
+		if err != nil {
+			return errContract
 		}
-		if !inturn && header.Difficulty.Cmp(diffNoTurn) != 0 {
+
+		if header.Difficulty.Cmp(rep) != 0 {
 			return errWrongDifficulty
 		}
 	}
@@ -536,7 +546,7 @@ func (c *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 	// Set the correct difficulty
 	// TODO: 返回的信誉值
-	header.Difficulty = calcDifficulty(snap, signer)
+	header.Difficulty, err = c.reputations.GetReputation(signer)
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
@@ -622,7 +632,6 @@ func (c *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 		return errUnauthorizedSigner
 	}
 
-	// TODO: 保持一样的逻辑，信誉再高，但是不能连续出块
 	// If we're amongst the recent signers, wait for the next block
 	for seen, recent := range snap.Recents {
 		if recent == signer {
@@ -634,9 +643,17 @@ func (c *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	}
 	// TODO: 根据信誉值规则添加延迟
 	//       1. 如果 reputation != maxRep, delay一段时间，即高信誉节点可以抢提交区块的权限
+	maxRep := big.NewInt(0)
+	for _, signer := range snap.signers() {
+
+		if rep, _ := c.reputations.GetReputation(signer); rep.Cmp(maxRep) > 0 {
+			maxRep = rep
+		}
+	}
+
 	// Sweet, the protocol permits us to sign the block, wait for our time
 	delay := time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
-	if header.Difficulty.Cmp(diffNoTurn) == 0 {
+	if header.Difficulty.Cmp(maxRep) == 0 {
 		// It's not our turn explicitly to sign, delay it a bit
 		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
 		delay += time.Duration(rand.Int63n(int64(wiggle)))
@@ -669,27 +686,25 @@ func (c *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 }
 
 // CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
-// that a new block should have:
-// * DIFF_NOTURN(2) if BLOCK_NUMBER % SIGNER_COUNT != SIGNER_INDEX
-// * DIFF_INTURN(1) if BLOCK_NUMBER % SIGNER_COUNT == SIGNER_INDEX
+// that a new block should have: current proposal repuation
 func (c *Repvm) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
-	snap, err := c.snapshot(chain, parent.Number.Uint64(), parent.Hash(), nil)
-	if err != nil {
-		return nil
-	}
-	c.lock.RLock()
-	signer := c.signer
-	c.lock.RUnlock()
-	return calcDifficulty(snap, signer)
-}
-
-func calcDifficulty(snap *Snapshot, signer common.Address) *big.Int {
 
 	// TODO: 查询signer的信誉值，并返回
 	// 步骤： 1. 调用reputation.sol智能合约
 	//       2. 返回signer的信誉值
+	c.lock.RLock()
+	signer := c.signer
+	c.lock.RUnlock()
 
-	return nil
+	// 查询出块节点的信誉值
+	reputation, err := c.reputations.GetReputation(signer)
+
+	if err != nil {
+		log.Error("信誉查询异常: ", err)
+		return big.NewInt(0)
+	}
+
+	return reputation
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

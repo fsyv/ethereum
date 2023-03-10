@@ -210,14 +210,22 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 
-			// TODO: 更新Signers
+			// 更新Signers
 			//       1. 通过智能合约获取节点的信誉值, 计算出阈值
 			//       2. 信誉值大于阈值，进入Signers
-			//        待讨论: 调用方法计算
-			//
+			// TODO 是不是更新所有合适一点？
+			// 更新所有的话，所有的signer从那儿来？
+			// if reputation.GetReputation(signer) >= reputation.getRepThreshold() {
+			// 	snap.Signers[header.Coinbase] = struct{}{}
+			// } else {
+			// 	// 从授权节点删除
+			// 	delete(snap.Signers, signer)
+			// }
 		}
 
-		// TODO: 因为signers列表变了，所以这里需要做修改
+		// 即使signers改动，这里保持不变
+		// 因为  如果signer留了下来，依旧不能连续出块
+		//      如果signer是新增的，不影响出块
 		// Delete the oldest signer from the recent list to allow it signing again
 		if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
 			delete(snap.Recents, number-limit)
