@@ -19,6 +19,7 @@ package repvm
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/ethereum/go-ethereum/reputation"
 	"sort"
 	"time"
 
@@ -182,7 +183,7 @@ func (s *Snapshot) uncast(address common.Address, authorize bool) bool {
 
 // apply creates a new authorization snapshot by applying the given headers to
 // the original one.
-func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
+func (s *Snapshot) apply(headers []*types.Header, rep *reputation.Reputation) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
 		return s, nil
@@ -215,12 +216,22 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			//       2. 信誉值大于阈值，进入Signers
 			// TODO 是不是更新所有合适一点？
 			// 更新所有的话，所有的signer从那儿来？
-			// if reputation.GetReputation(signer) >= reputation.getRepThreshold() {
-			// 	snap.Signers[header.Coinbase] = struct{}{}
-			// } else {
-			// 	// 从授权节点删除
-			// 	delete(snap.Signers, signer)
-			// }
+			reputation, err := rep.GetReputation(header.Coinbase)
+			if err != nil {
+				return nil, errContract
+			}
+
+			repThreshold, err := rep.GetRepThreshold()
+			if err != nil {
+				return nil, errContract
+			}
+
+			if reputation.Cmp(repThreshold) >= 0 {
+				snap.Signers[header.Coinbase] = struct{}{}
+			} else {
+				// 从授权节点删除
+				delete(snap.Signers, header.Coinbase)
+			}
 		}
 
 		// 即使signers改动，这里保持不变

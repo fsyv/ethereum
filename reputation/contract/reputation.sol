@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 /**
- * @title 信誉管理的智能合约
+ * @title 信誉管理(Reputation Value)的智能合约
  */
-contract Reputation {
+contract RepValue {
     /**
-     * @dev 获取节点信誉值
-     * @param _address 节点地址
+     * @dev 获取账户信誉值
+     * @param account 节点地址
      * @return 返回查询节点的信誉值
      */
-    function getReputation(address _address) public view returns (uint256) {
-        if (reputations.contains(_address)) {
-            return reputations.get(_address);
+    function getReputation(address account) public view returns (uint256) {
+        if (_reputation.contains(account)) {
+            return _reputation.get(account);
         } else {
             return 0;
         }
@@ -33,16 +32,17 @@ contract Reputation {
         // 统计有效节点数量
         uint256 signer_valid_count = 0;
 
-        for (uint256 i = 0; i < reputations.length(); i++) {
+        for (uint256 i = 0; i < _reputation.length(); i++) {
+            // 活动信誉值
+            (, uint256 reputation) = _reputation.at(i);
             // 统计信誉值大于0的节点
-            (, uint256 reputation) = reputations.at(i);
-
             if (reputation > 0) {
                 rep_valid_sum += reputation;
                 signer_valid_count++;
             }
         }
 
+        // 防止除0
         if (0 == signer_valid_count) return 0;
 
         return rep_valid_sum / signer_valid_count;
@@ -50,24 +50,30 @@ contract Reputation {
 
     /**
      * @dev 更新节点信誉值
-     * @param _address 节点地址
-     * @param _score 得分
+     * @param account 节点地址
+     * @param reward 奖励
      */
-    function updateReputation(address _address, int _score) public {
-        // 判断系统中是否已经有该节点
-        if (reputations.contains(_address)) {
-            uint256 rep = reputations.get(_address);
+    function updateReputation(address account, int reward) public {
+        // 查询系统中是否存在改账户
+        if (_reputation.contains(account)) {
+            uint256 reputation = _reputation.get(account);
 
-            if (_score < 0) {
-                SafeMath.sub(rep, SignedMath.abs(_score));
+            if (reward < 0) {
+                reputation -= SignedMath.abs(reward);
             } else {
-                SafeMath.add(rep, uint(_score));
+                reputation += uint(reward);
             }
 
-            reputations.set(_address, rep);
+            _reputation.set(account, reputation);
         } else {
-            // 如果地址不存在，则插入
-            reputations.set(_address, uint(_score));
+            // 账户不存在，插入数据
+
+            uint256 reputation = 0;
+            if (reward > 0) {
+                reputation += uint(reward);
+            }
+
+            _reputation.set(account, reputation);
         }
     }
 
@@ -78,5 +84,5 @@ contract Reputation {
      *      写入: 不存在则插入
      *      读取: 不存在则为0
      */
-    EnumerableMap.AddressToUintMap private reputations;
+    EnumerableMap.AddressToUintMap private _reputation;
 }

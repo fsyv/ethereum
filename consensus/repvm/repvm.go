@@ -189,12 +189,12 @@ type Repvm struct {
 	// The fields below are for testing only
 	fakeDiff bool // Skip difficulty verifications
 
-	reputations *reputation.Reputations //访问智能合约
+	rep *reputation.Reputation //访问智能合约
 }
 
 // New creates a Repvm proof-of-authority consensus engine with the initial
 // signers set to the ones provided by the user.
-func New(config *params.RepvmConfig, db ethdb.Database) *Repvm {
+func New(config *params.RepvmConfig, db ethdb.Database, rep *reputation.Reputation) *Repvm {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {
@@ -205,36 +205,36 @@ func New(config *params.RepvmConfig, db ethdb.Database) *Repvm {
 	signatures, _ := lru.NewARC(inmemorySignatures)
 
 	return &Repvm{
-		config:      &conf,
-		db:          db,
-		recents:     recents,
-		signatures:  signatures,
-		proposals:   make(map[common.Address]bool),
-		reputations: reputation.NewReputations("test"),
+		config:     &conf,
+		db:         db,
+		recents:    recents,
+		signatures: signatures,
+		proposals:  make(map[common.Address]bool),
+		rep:        rep,
 	}
 }
 
 // Author implements consensus.Engine, returning the Ethereum address recovered
 // from the signature in the header's extra-data section.
-func (c *Repvm) Author(header *types.Header) (common.Address, error) {
-	return ecrecover(header, c.signatures)
+func (r *Repvm) Author(header *types.Header) (common.Address, error) {
+	return ecrecover(header, r.signatures)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
-func (c *Repvm) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
-	return c.verifyHeader(chain, header, nil)
+func (r *Repvm) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
+	return r.verifyHeader(chain, header, nil)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
-func (c *Repvm) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (r *Repvm) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
 	go func() {
 		for i, header := range headers {
-			err := c.verifyHeader(chain, header, headers[:i])
+			err := r.verifyHeader(chain, header, headers[:i])
 
 			select {
 			case <-abort:
@@ -250,7 +250,7 @@ func (c *Repvm) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*type
 // caller may optionally pass in a batch of parents (ascending order) to avoid
 // looking those up from the database. This is useful for concurrently verifying
 // a batch of new headers.
-func (c *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) error {
+func (r *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) error {
 	if header.Number == nil {
 		return errUnknownBlock
 	}
@@ -261,7 +261,7 @@ func (c *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return consensus.ErrFutureBlock
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
-	checkpoint := (number % c.config.Epoch) == 0
+	checkpoint := (number % r.config.Epoch) == 0
 	if checkpoint && header.Coinbase != (common.Address{}) {
 		return errInvalidCheckpointBeneficiary
 	}
@@ -313,14 +313,14 @@ func (c *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return err
 	}
 	// All basic checks passed, verify cascading fields
-	return c.verifyCascadingFields(chain, header, parents)
+	return r.verifyCascadingFields(chain, header, parents)
 }
 
 // verifyCascadingFields verifies all the header fields that are not standalone,
 // rather depend on a batch of previous headers. The caller may optionally pass
 // in a batch of parents (ascending order) to avoid looking those up from the
 // database. This is useful for concurrently verifying a batch of new headers.
-func (c *Repvm) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) error {
+func (r *Repvm) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) error {
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -336,7 +336,7 @@ func (c *Repvm) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
 	}
-	if parent.Time+c.config.Period > header.Time {
+	if parent.Time+r.config.Period > header.Time {
 		return errInvalidTimestamp
 	}
 	// Verify that the gasUsed is <= gasLimit
@@ -356,12 +356,12 @@ func (c *Repvm) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		return err
 	}
 	// Retrieve the snapshot needed to verify this header and cache it
-	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
+	snap, err := r.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {
 		return err
 	}
 	// If the block is a checkpoint block, verify the signer list
-	if number%c.config.Epoch == 0 {
+	if number%r.config.Epoch == 0 {
 		signers := make([]byte, len(snap.Signers)*common.AddressLength)
 		for i, signer := range snap.signers() {
 			copy(signers[i*common.AddressLength:], signer[:])
@@ -372,11 +372,11 @@ func (c *Repvm) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		}
 	}
 	// All basic checks passed, verify the seal and return
-	return c.verifySeal(snap, header, parents)
+	return r.verifySeal(snap, header, parents)
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
-func (c *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
+func (r *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
 	// Search for a snapshot in memory or on disk for checkpoints
 	var (
 		headers []*types.Header
@@ -384,13 +384,13 @@ func (c *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 	)
 	for snap == nil {
 		// If an in-memory snapshot was found, use that
-		if s, ok := c.recents.Get(hash); ok {
+		if s, ok := r.recents.Get(hash); ok {
 			snap = s.(*Snapshot)
 			break
 		}
 		// If an on-disk checkpoint snapshot can be found, use that
 		if number%checkpointInterval == 0 {
-			if s, err := loadSnapshot(c.config, c.signatures, c.db, hash); err == nil {
+			if s, err := loadSnapshot(r.config, r.signatures, r.db, hash); err == nil {
 				log.Trace("Loaded voting snapshot from disk", "number", number, "hash", hash)
 				snap = s
 				break
@@ -400,7 +400,7 @@ func (c *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 		// at a checkpoint block without a parent (light client CHT), or we have piled
 		// up more headers than allowed to be reorged (chain reinit from a freezer),
 		// consider the checkpoint trusted and snapshot it.
-		if number == 0 || (number%c.config.Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
+		if number == 0 || (number%r.config.Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
 				hash := checkpoint.Hash()
@@ -409,8 +409,8 @@ func (c *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 				for i := 0; i < len(signers); i++ {
 					copy(signers[i][:], checkpoint.Extra[extraVanity+i*common.AddressLength:])
 				}
-				snap = newSnapshot(c.config, c.signatures, number, hash, signers)
-				if err := snap.store(c.db); err != nil {
+				snap = newSnapshot(r.config, r.signatures, number, hash, signers)
+				if err := snap.store(r.db); err != nil {
 					return nil, err
 				}
 				log.Info("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
@@ -440,15 +440,15 @@ func (c *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 	for i := 0; i < len(headers)/2; i++ {
 		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
 	}
-	snap, err := snap.apply(headers)
+	snap, err := snap.apply(headers, r.rep)
 	if err != nil {
 		return nil, err
 	}
-	c.recents.Add(snap.Hash, snap)
+	r.recents.Add(snap.Hash, snap)
 
 	// If we've generated a new checkpoint snapshot, save to disk
 	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
-		if err = snap.store(c.db); err != nil {
+		if err = snap.store(r.db); err != nil {
 			return nil, err
 		}
 		log.Trace("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
@@ -458,7 +458,7 @@ func (c *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 
 // VerifyUncles implements consensus.Engine, always returning an error for any
 // uncles as this consensus mechanism doesn't permit uncles.
-func (c *Repvm) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {
+func (r *Repvm) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {
 	if len(block.Uncles()) > 0 {
 		return errors.New("uncles not allowed")
 	}
@@ -469,14 +469,14 @@ func (c *Repvm) VerifyUncles(chain consensus.ChainReader, block *types.Block) er
 // consensus protocol requirements. The method accepts an optional list of parent
 // headers that aren't yet part of the local blockchain to generate the snapshots
 // from.
-func (c *Repvm) verifySeal(snap *Snapshot, header *types.Header, parents []*types.Header) error {
+func (r *Repvm) verifySeal(snap *Snapshot, header *types.Header, parents []*types.Header) error {
 	// Verifying the genesis block is not supported
 	number := header.Number.Uint64()
 	if number == 0 {
 		return errUnknownBlock
 	}
 	// Resolve the authorization key and check against signers
-	signer, err := ecrecover(header, c.signatures)
+	signer, err := ecrecover(header, r.signatures)
 	if err != nil {
 		return err
 	}
@@ -493,9 +493,9 @@ func (c *Repvm) verifySeal(snap *Snapshot, header *types.Header, parents []*type
 	}
 	// Ensure that the difficulty corresponds to the turn-ness of the signer
 	// TODO: 逻辑一样，不过变成检验难度是否和信誉值相同
-	if !c.fakeDiff {
+	if !r.fakeDiff {
 
-		rep, err := c.reputations.GetReputation(signer)
+		rep, err := r.rep.GetReputation(signer)
 		if err != nil {
 			return errContract
 		}
@@ -509,22 +509,22 @@ func (c *Repvm) verifySeal(snap *Snapshot, header *types.Header, parents []*type
 
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
-func (c *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
+func (r *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
 	// Assemble the voting snapshot to check which votes make sense
-	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+	snap, err := r.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
 		return err
 	}
-	c.lock.RLock()
-	if number%c.config.Epoch != 0 {
+	r.lock.RLock()
+	if number%r.config.Epoch != 0 {
 		// Gather all the proposals that make sense voting on
-		addresses := make([]common.Address, 0, len(c.proposals))
-		for address, authorize := range c.proposals {
+		addresses := make([]common.Address, 0, len(r.proposals))
+		for address, authorize := range r.proposals {
 			if snap.validVote(address, authorize) {
 				addresses = append(addresses, address)
 			}
@@ -532,7 +532,7 @@ func (c *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 		// If there's pending proposals, cast a vote on them
 		if len(addresses) > 0 {
 			header.Coinbase = addresses[rand.Intn(len(addresses))]
-			if c.proposals[header.Coinbase] {
+			if r.proposals[header.Coinbase] {
 				copy(header.Nonce[:], nonceAuthVote)
 			} else {
 				copy(header.Nonce[:], nonceDropVote)
@@ -541,12 +541,12 @@ func (c *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	}
 
 	// Copy signer protected by mutex to avoid race condition
-	signer := c.signer
-	c.lock.RUnlock()
+	signer := r.signer
+	r.lock.RUnlock()
 
 	// Set the correct difficulty
 	// TODO: 返回的信誉值
-	header.Difficulty, err = c.reputations.GetReputation(signer)
+	header.Difficulty, err = r.rep.GetReputation(signer)
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
@@ -554,7 +554,7 @@ func (c *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	}
 	header.Extra = header.Extra[:extraVanity]
 
-	if number%c.config.Epoch == 0 {
+	if number%r.config.Epoch == 0 {
 		for _, signer := range snap.signers() {
 			header.Extra = append(header.Extra, signer[:]...)
 		}
@@ -569,7 +569,7 @@ func (c *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Time = parent.Time + c.config.Period
+	header.Time = parent.Time + r.config.Period
 	if header.Time < uint64(time.Now().Unix()) {
 		header.Time = uint64(time.Now().Unix())
 	}
@@ -578,7 +578,7 @@ func (c *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, nor block
 // rewards given.
-func (c *Repvm) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
+func (r *Repvm) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
 	// No block rewards in PoA, so the state remains as is and uncles are dropped
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
@@ -586,9 +586,9 @@ func (c *Repvm) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
 // nor block rewards given, and returns the final block.
-func (c *Repvm) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+func (r *Repvm) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Finalize block
-	c.Finalize(chain, header, state, txs, uncles)
+	r.Finalize(chain, header, state, txs, uncles)
 
 	// Assemble and return the final block for sealing
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil
@@ -596,17 +596,17 @@ func (c *Repvm) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 // Authorize injects a private key into the consensus engine to mint new blocks
 // with.
-func (c *Repvm) Authorize(signer common.Address, signFn SignerFn) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (r *Repvm) Authorize(signer common.Address, signFn SignerFn) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
-	c.signer = signer
-	c.signFn = signFn
+	r.signer = signer
+	r.signFn = signFn
 }
 
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
-func (c *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
+func (r *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	header := block.Header()
 
 	// Sealing the genesis block is not supported
@@ -615,16 +615,16 @@ func (c *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 		return errUnknownBlock
 	}
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
-	if c.config.Period == 0 && len(block.Transactions()) == 0 {
+	if r.config.Period == 0 && len(block.Transactions()) == 0 {
 		return errors.New("sealing paused while waiting for transactions")
 	}
 	// Don't hold the signer fields for the entire sealing procedure
-	c.lock.RLock()
-	signer, signFn := c.signer, c.signFn
-	c.lock.RUnlock()
+	r.lock.RLock()
+	signer, signFn := r.signer, r.signFn
+	r.lock.RUnlock()
 
 	// Bail out if we're unauthorized to sign a block
-	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+	snap, err := r.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
 		return err
 	}
@@ -646,7 +646,7 @@ func (c *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	maxRep := big.NewInt(0)
 	for _, signer := range snap.signers() {
 
-		if rep, _ := c.reputations.GetReputation(signer); rep.Cmp(maxRep) > 0 {
+		if rep, _ := r.rep.GetReputation(signer); rep.Cmp(maxRep) > 0 {
 			maxRep = rep
 		}
 	}
@@ -687,17 +687,17 @@ func (c *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 
 // CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
 // that a new block should have: current proposal repuation
-func (c *Repvm) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
+func (r *Repvm) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
 
 	// TODO: 查询signer的信誉值，并返回
 	// 步骤： 1. 调用reputation.sol智能合约
 	//       2. 返回signer的信誉值
-	c.lock.RLock()
-	signer := c.signer
-	c.lock.RUnlock()
+	r.lock.RLock()
+	signer := r.signer
+	r.lock.RUnlock()
 
 	// 查询出块节点的信誉值
-	reputation, err := c.reputations.GetReputation(signer)
+	reputation, err := r.rep.GetReputation(signer)
 
 	if err != nil {
 		log.Error("信誉查询异常: ", err)
@@ -708,21 +708,21 @@ func (c *Repvm) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
-func (c *Repvm) SealHash(header *types.Header) common.Hash {
+func (r *Repvm) SealHash(header *types.Header) common.Hash {
 	return SealHash(header)
 }
 
 // Close implements consensus.Engine. It's a noop for repvm as there are no background threads.
-func (c *Repvm) Close() error {
+func (r *Repvm) Close() error {
 	return nil
 }
 
 // APIs implements consensus.Engine, returning the user facing RPC API to allow
 // controlling the signer voting.
-func (c *Repvm) APIs(chain consensus.ChainHeaderReader) []rpc.API {
+func (r *Repvm) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	return []rpc.API{{
 		Namespace: "repvm",
-		Service:   &API{chain: chain, repvm: c},
+		Service:   &API{chain: chain, repvm: r},
 	}}
 }
 

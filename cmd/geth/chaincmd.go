@@ -20,9 +20,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/reputation"
+	"math"
+	"math/big"
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -186,6 +193,17 @@ func initGenesis(ctx *cli.Context) error {
 	}
 
 	// TODO: 部署reputation.sol合约
+	// deploy stroage contract
+	addr := common.HexToAddress(reputation.ReputationAccount)
+	bytecode, err := prepareContractCode(genesis.Config, reputation.ReputationABI, reputation.ReputationBin, addr)
+	if err != nil {
+		utils.Fatalf("invalid contract bytecode: %v", err)
+	}
+	genesis.Alloc[addr] = core.GenesisAccount{
+		Balance: big.NewInt(0),
+		Code:    bytecode,
+	}
+	log.Info("deploy contract", "account", reputation.ReputationAccount)
 
 	// Open and initialise both full and light databases
 	stack, _ := makeConfigNode(ctx)
@@ -458,4 +476,32 @@ func dump(ctx *cli.Context) error {
 func hashish(x string) bool {
 	_, err := strconv.Atoi(x)
 	return err != nil
+}
+
+func prepareContractCode(chainConfig *params.ChainConfig, contractABI string,
+	contractBin string, contractAddress common.Address, params ...interface{}) ([]byte, error) {
+	// load contract abi data
+	parsed, err := abi.JSON(strings.NewReader(contractABI))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// execute construct function, and storage in contract code
+	input, err := parsed.Pack("", params...)
+	if err != nil {
+		return []byte{}, err
+	}
+	bytecode := append(common.FromHex(contractBin), input...)
+
+	// evm execute contract
+	sender := vm.AccountRef(common.Address{})
+	contract := vm.NewContract(sender, vm.AccountRef(contractAddress), new(big.Int).SetInt64(0), math.MaxUint64)
+	contract.Code = bytecode
+	vmenv := vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, nil, chainConfig, vm.Config{})
+	ret, err := vmenv.Interpreter().Run(contract, nil, false)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return ret, nil
 }

@@ -225,7 +225,7 @@ func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, co
 		engine = clique.New(chainConfig.Clique, db)
 	} else if chainConfig.Repvm != nil {
 		// 初始化 repvm 共识算法
-		engine = repvm.New(chainConfig.Repvm, db)
+		engine = repvm.New(chainConfig.Repvm, db, stack.Reputation())
 	} else {
 		switch config.PowMode {
 		case ethash.ModeFake:

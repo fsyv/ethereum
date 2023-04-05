@@ -435,6 +435,9 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 		}()
 	}
 
+	// 绑定信誉管理的智能
+	stack.BindContract(backend, ethClient)
+
 	// Start auxiliary services if enabled
 	if ctx.Bool(utils.MiningEnabledFlag.Name) || ctx.Bool(utils.DeveloperFlag.Name) {
 		// Mining only makes sense if a full Ethereum node is running

@@ -20,6 +20,10 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"hash/crc32"
 	"net/http"
 	"os"
@@ -36,6 +40,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/reputation"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/prometheus/tsdb/fileutil"
 )
@@ -55,14 +60,15 @@ type Node struct {
 	state         int               // Tracks state of node lifecycle
 
 	lock          sync.Mutex
-	lifecycles    []Lifecycle // All registered backends, services, and auxiliary services that have a lifecycle
-	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
-	http          *httpServer //
-	ws            *httpServer //
-	httpAuth      *httpServer //
-	wsAuth        *httpServer //
-	ipc           *ipcServer  // Stores information about the ipc http server
-	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
+	lifecycles    []Lifecycle            // All registered backends, services, and auxiliary services that have a lifecycle
+	rpcAPIs       []rpc.API              // List of APIs currently provided by the node
+	http          *httpServer            //
+	ws            *httpServer            //
+	httpAuth      *httpServer            //
+	wsAuth        *httpServer            //
+	ipc           *ipcServer             // Stores information about the ipc http server
+	inprocHandler *rpc.Server            // In-process RPC request handler to process the API requests
+	rep           *reputation.Reputation // 信誉管理
 
 	databases map[*closeTrackingDB]struct{} // All open databases
 }
@@ -157,6 +163,7 @@ func New(conf *Config) (*Node, error) {
 	node.ws = newHTTPServer(node.log, rpc.DefaultHTTPTimeouts)
 	node.wsAuth = newHTTPServer(node.log, rpc.DefaultHTTPTimeouts)
 	node.ipc = newIPCServer(node.log, conf.IPCEndpoint())
+	node.rep = reputation.New(node.log)
 
 	return node, nil
 }
@@ -771,4 +778,27 @@ func (n *Node) closeDatabases() (errors []error) {
 		}
 	}
 	return errors
+}
+
+func (n *Node) Reputation() *reputation.Reputation {
+	return n.rep
+}
+
+func (n *Node) BindContract(backend ethapi.Backend, client *ethclient.Client) error {
+	// 解锁对应账户
+	ks := n.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+
+	json, err := os.ReadFile(ks.Accounts()[0].URL.Path)
+	if err != nil {
+		return err
+	}
+
+	key, err := keystore.DecryptKey(json, "123")
+	if err != nil {
+		return err
+	}
+
+	_, err = reputation.DeployContract(client, common.Bytes2Hex(crypto.FromECDSA(key.PrivateKey)))
+
+	return n.rep.BindContract(client, common.Bytes2Hex(crypto.FromECDSA(key.PrivateKey)), common.HexToAddress(reputation.ReputationAccount))
 }

@@ -374,32 +374,32 @@ func (_EnumerableSet *EnumerableSetTransactorRaw) Transact(opts *bind.TransactOp
 	return _EnumerableSet.Contract.contract.Transact(opts, method, params...)
 }
 
-// ReputationMetaData contains all meta data concerning the Reputation contract.
-var ReputationMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"getRepThreshold\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_address\",\"type\":\"address\"}],\"name\":\"getReputation\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_address\",\"type\":\"address\"},{\"internalType\":\"int256\",\"name\":\"_score\",\"type\":\"int256\"}],\"name\":\"updateReputation\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+// RepValueMetaData contains all meta data concerning the RepValue contract.
+var RepValueMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[],\"name\":\"getRepThreshold\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"getReputation\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"int256\",\"name\":\"reward\",\"type\":\"int256\"}],\"name\":\"updateReputation\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 	Sigs: map[string]string{
 		"ef4165f2": "getRepThreshold()",
 		"9c89a0e2": "getReputation(address)",
 		"6a08b511": "updateReputation(address,int256)",
 	},
-	Bin: "0x608060405234801561001057600080fd5b50610510806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80636a08b511146100465780639c89a0e21461005b578063ef4165f214610080575b600080fd5b6100596100543660046103e3565b610088565b005b61006e61006936600461040d565b6100f6565b60405190815260200160405180910390f35b61006e610125565b6100936000836101a1565b156100e55760006100a481846101bd565b905060008212156100c7576100c1816100bc846101d2565b6101e9565b506100d3565b6100d181836101f5565b505b6100df60008483610201565b50505050565b6100f160008383610201565b505050565b600061010281836101a1565b15610118576101126000836101bd565b92915050565b506000919050565b919050565b60008080805b610135600061021f565b81101561017e576000610148818361022a565b915050801561016b5761015b818561043e565b93508261016781610451565b9350505b508061017681610451565b91505061012b565b50806000036101905760009250505090565b61019a818361046a565b9250505090565b60006101b6836001600160a01b038416610246565b9392505050565b60006101b6836001600160a01b038416610252565b6000808212156101e55781600003610112565b5090565b60006101b6828461048c565b60006101b6828461043e565b6000610217846001600160a01b038516846102c6565b949350505050565b6000610112826102e3565b600080808061023986866102ee565b9097909650945050505050565b60006101b68383610319565b60008181526002830160205260408120548015158061027657506102768484610246565b6101b65760405162461bcd60e51b815260206004820152601e60248201527f456e756d657261626c654d61703a206e6f6e6578697374656e74206b65790000604482015260640160405180910390fd5b600082815260028401602052604081208290556102178484610331565b60006101128261033d565b600080806102fc8585610347565b600081815260029690960160205260409095205494959350505050565b600081815260018301602052604081205415156101b6565b60006101b68383610353565b6000610112825490565b60006101b683836103a2565b600081815260018301602052604081205461039a57508154600181810184556000848152602080822090930184905584548482528286019093526040902091909155610112565b506000610112565b60008260000182815481106103b9576103b961049f565b9060005260206000200154905092915050565b80356001600160a01b038116811461012057600080fd5b600080604083850312156103f657600080fd5b6103ff836103cc565b946020939093013593505050565b60006020828403121561041f57600080fd5b6101b6826103cc565b634e487b7160e01b600052601160045260246000fd5b8082018082111561011257610112610428565b60006001820161046357610463610428565b5060010190565b60008261048757634e487b7160e01b600052601260045260246000fd5b500490565b8181038181111561011257610112610428565b634e487b7160e01b600052603260045260246000fdfea264697066735822122054cf3c06ea75389d5df5de0a10c72d3d8370647a40dbd63761292c579c31d59964736f6c637827302e382e31392d646576656c6f702e323032332e332e372b636f6d6d69742e37646436643430340058",
+	Bin: "0x608060405234801561001057600080fd5b506104fe806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80636a08b511146100465780639c89a0e21461005b578063ef4165f214610080575b600080fd5b6100596100543660046103d1565b610088565b005b61006e6100693660046103fb565b6100fc565b60405190815260200160405180910390f35b61006e61012b565b6100936000836101a7565b156100e85760006100a481846101c3565b905060008212156100c9576100b8826101d8565b6100c2908261042c565b90506100d6565b6100d3828261043f565b90505b6100e2600084836101ef565b50505050565b6000808213156100d6576100d3828261043f565b600061010881836101a7565b1561011e576101186000836101c3565b92915050565b506000919050565b919050565b60008080805b61013b600061020d565b81101561018457600061014e8183610218565b915050801561017157610161818561043f565b93508261016d81610452565b9350505b508061017c81610452565b915050610131565b50806000036101965760009250505090565b6101a0818361046b565b9250505090565b60006101bc836001600160a01b038416610234565b9392505050565b60006101bc836001600160a01b038416610240565b6000808212156101eb5781600003610118565b5090565b6000610205846001600160a01b038516846102b4565b949350505050565b6000610118826102d1565b600080808061022786866102dc565b9097909650945050505050565b60006101bc8383610307565b60008181526002830160205260408120548015158061026457506102648484610234565b6101bc5760405162461bcd60e51b815260206004820152601e60248201527f456e756d657261626c654d61703a206e6f6e6578697374656e74206b65790000604482015260640160405180910390fd5b60008281526002840160205260408120829055610205848461031f565b60006101188261032b565b600080806102ea8585610335565b600081815260029690960160205260409095205494959350505050565b600081815260018301602052604081205415156101bc565b60006101bc8383610341565b6000610118825490565b60006101bc8383610390565b600081815260018301602052604081205461038857508154600181810184556000848152602080822090930184905584548482528286019093526040902091909155610118565b506000610118565b60008260000182815481106103a7576103a761048d565b9060005260206000200154905092915050565b80356001600160a01b038116811461012657600080fd5b600080604083850312156103e457600080fd5b6103ed836103ba565b946020939093013593505050565b60006020828403121561040d57600080fd5b6101bc826103ba565b634e487b7160e01b600052601160045260246000fd5b8181038181111561011857610118610416565b8082018082111561011857610118610416565b60006001820161046457610464610416565b5060010190565b60008261048857634e487b7160e01b600052601260045260246000fd5b500490565b634e487b7160e01b600052603260045260246000fdfea2646970667358221220edabdf641817cfa010209c18b3e855164394743949c59e393ea2e31105a21d8f64736f6c637827302e382e31392d646576656c6f702e323032332e332e372b636f6d6d69742e37646436643430340058",
 }
 
-// ReputationABI is the input ABI used to generate the binding from.
-// Deprecated: Use ReputationMetaData.ABI instead.
-var ReputationABI = ReputationMetaData.ABI
+// RepValueABI is the input ABI used to generate the binding from.
+// Deprecated: Use RepValueMetaData.ABI instead.
+var RepValueABI = RepValueMetaData.ABI
 
-// Deprecated: Use ReputationMetaData.Sigs instead.
-// ReputationFuncSigs maps the 4-byte function signature to its string representation.
-var ReputationFuncSigs = ReputationMetaData.Sigs
+// Deprecated: Use RepValueMetaData.Sigs instead.
+// RepValueFuncSigs maps the 4-byte function signature to its string representation.
+var RepValueFuncSigs = RepValueMetaData.Sigs
 
-// ReputationBin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use ReputationMetaData.Bin instead.
-var ReputationBin = ReputationMetaData.Bin
+// RepValueBin is the compiled bytecode used for deploying new contracts.
+// Deprecated: Use RepValueMetaData.Bin instead.
+var RepValueBin = RepValueMetaData.Bin
 
-// DeployReputation deploys a new Ethereum contract, binding an instance of Reputation to it.
-func DeployReputation(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Reputation, error) {
-	parsed, err := ReputationMetaData.GetAbi()
+// DeployRepValue deploys a new Ethereum contract, binding an instance of RepValue to it.
+func DeployRepValue(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *RepValue, error) {
+	parsed, err := RepValueMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -407,367 +407,111 @@ func DeployReputation(auth *bind.TransactOpts, backend bind.ContractBackend) (co
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ReputationBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(RepValueBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &Reputation{ReputationCaller: ReputationCaller{contract: contract}, ReputationTransactor: ReputationTransactor{contract: contract}, ReputationFilterer: ReputationFilterer{contract: contract}}, nil
+	return address, tx, &RepValue{RepValueCaller: RepValueCaller{contract: contract}, RepValueTransactor: RepValueTransactor{contract: contract}, RepValueFilterer: RepValueFilterer{contract: contract}}, nil
 }
 
-// Reputation is an auto generated Go binding around an Ethereum contract.
-type Reputation struct {
-	ReputationCaller     // Read-only binding to the contract
-	ReputationTransactor // Write-only binding to the contract
-	ReputationFilterer   // Log filterer for contract events
+// RepValue is an auto generated Go binding around an Ethereum contract.
+type RepValue struct {
+	RepValueCaller     // Read-only binding to the contract
+	RepValueTransactor // Write-only binding to the contract
+	RepValueFilterer   // Log filterer for contract events
 }
 
-// ReputationCaller is an auto generated read-only Go binding around an Ethereum contract.
-type ReputationCaller struct {
+// RepValueCaller is an auto generated read-only Go binding around an Ethereum contract.
+type RepValueCaller struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// ReputationTransactor is an auto generated write-only Go binding around an Ethereum contract.
-type ReputationTransactor struct {
+// RepValueTransactor is an auto generated write-only Go binding around an Ethereum contract.
+type RepValueTransactor struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// ReputationFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
-type ReputationFilterer struct {
+// RepValueFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type RepValueFilterer struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// ReputationSession is an auto generated Go binding around an Ethereum contract,
+// RepValueSession is an auto generated Go binding around an Ethereum contract,
 // with pre-set call and transact options.
-type ReputationSession struct {
-	Contract     *Reputation       // Generic contract binding to set the session for
+type RepValueSession struct {
+	Contract     *RepValue         // Generic contract binding to set the session for
 	CallOpts     bind.CallOpts     // Call options to use throughout this session
 	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
 }
 
-// ReputationCallerSession is an auto generated read-only Go binding around an Ethereum contract,
+// RepValueCallerSession is an auto generated read-only Go binding around an Ethereum contract,
 // with pre-set call options.
-type ReputationCallerSession struct {
-	Contract *ReputationCaller // Generic contract caller binding to set the session for
-	CallOpts bind.CallOpts     // Call options to use throughout this session
-}
-
-// ReputationTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
-// with pre-set transact options.
-type ReputationTransactorSession struct {
-	Contract     *ReputationTransactor // Generic contract transactor binding to set the session for
-	TransactOpts bind.TransactOpts     // Transaction auth options to use throughout this session
-}
-
-// ReputationRaw is an auto generated low-level Go binding around an Ethereum contract.
-type ReputationRaw struct {
-	Contract *Reputation // Generic contract binding to access the raw methods on
-}
-
-// ReputationCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
-type ReputationCallerRaw struct {
-	Contract *ReputationCaller // Generic read-only contract binding to access the raw methods on
-}
-
-// ReputationTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
-type ReputationTransactorRaw struct {
-	Contract *ReputationTransactor // Generic write-only contract binding to access the raw methods on
-}
-
-// NewReputation creates a new instance of Reputation, bound to a specific deployed contract.
-func NewReputation(address common.Address, backend bind.ContractBackend) (*Reputation, error) {
-	contract, err := bindReputation(address, backend, backend, backend)
-	if err != nil {
-		return nil, err
-	}
-	return &Reputation{ReputationCaller: ReputationCaller{contract: contract}, ReputationTransactor: ReputationTransactor{contract: contract}, ReputationFilterer: ReputationFilterer{contract: contract}}, nil
-}
-
-// NewReputationCaller creates a new read-only instance of Reputation, bound to a specific deployed contract.
-func NewReputationCaller(address common.Address, caller bind.ContractCaller) (*ReputationCaller, error) {
-	contract, err := bindReputation(address, caller, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &ReputationCaller{contract: contract}, nil
-}
-
-// NewReputationTransactor creates a new write-only instance of Reputation, bound to a specific deployed contract.
-func NewReputationTransactor(address common.Address, transactor bind.ContractTransactor) (*ReputationTransactor, error) {
-	contract, err := bindReputation(address, nil, transactor, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &ReputationTransactor{contract: contract}, nil
-}
-
-// NewReputationFilterer creates a new log filterer instance of Reputation, bound to a specific deployed contract.
-func NewReputationFilterer(address common.Address, filterer bind.ContractFilterer) (*ReputationFilterer, error) {
-	contract, err := bindReputation(address, nil, nil, filterer)
-	if err != nil {
-		return nil, err
-	}
-	return &ReputationFilterer{contract: contract}, nil
-}
-
-// bindReputation binds a generic wrapper to an already deployed contract.
-func bindReputation(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(ReputationABI))
-	if err != nil {
-		return nil, err
-	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_Reputation *ReputationRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _Reputation.Contract.ReputationCaller.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_Reputation *ReputationRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Reputation.Contract.ReputationTransactor.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_Reputation *ReputationRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _Reputation.Contract.ReputationTransactor.contract.Transact(opts, method, params...)
-}
-
-// Call invokes the (constant) contract method with params as input values and
-// sets the output to result. The result type might be a single field for simple
-// returns, a slice of interfaces for anonymous returns and a struct for named
-// returns.
-func (_Reputation *ReputationCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _Reputation.Contract.contract.Call(opts, result, method, params...)
-}
-
-// Transfer initiates a plain transaction to move funds to the contract, calling
-// its default method if one is available.
-func (_Reputation *ReputationTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Reputation.Contract.contract.Transfer(opts)
-}
-
-// Transact invokes the (paid) contract method with params as input values.
-func (_Reputation *ReputationTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _Reputation.Contract.contract.Transact(opts, method, params...)
-}
-
-// GetRepThreshold is a free data retrieval call binding the contract method 0xef4165f2.
-//
-// Solidity: function getRepThreshold() view returns(uint256)
-func (_Reputation *ReputationCaller) GetRepThreshold(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
-	err := _Reputation.contract.Call(opts, &out, "getRepThreshold")
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// GetRepThreshold is a free data retrieval call binding the contract method 0xef4165f2.
-//
-// Solidity: function getRepThreshold() view returns(uint256)
-func (_Reputation *ReputationSession) GetRepThreshold() (*big.Int, error) {
-	return _Reputation.Contract.GetRepThreshold(&_Reputation.CallOpts)
-}
-
-// GetRepThreshold is a free data retrieval call binding the contract method 0xef4165f2.
-//
-// Solidity: function getRepThreshold() view returns(uint256)
-func (_Reputation *ReputationCallerSession) GetRepThreshold() (*big.Int, error) {
-	return _Reputation.Contract.GetRepThreshold(&_Reputation.CallOpts)
-}
-
-// GetReputation is a free data retrieval call binding the contract method 0x9c89a0e2.
-//
-// Solidity: function getReputation(address _address) view returns(uint256)
-func (_Reputation *ReputationCaller) GetReputation(opts *bind.CallOpts, _address common.Address) (*big.Int, error) {
-	var out []interface{}
-	err := _Reputation.contract.Call(opts, &out, "getReputation", _address)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// GetReputation is a free data retrieval call binding the contract method 0x9c89a0e2.
-//
-// Solidity: function getReputation(address _address) view returns(uint256)
-func (_Reputation *ReputationSession) GetReputation(_address common.Address) (*big.Int, error) {
-	return _Reputation.Contract.GetReputation(&_Reputation.CallOpts, _address)
-}
-
-// GetReputation is a free data retrieval call binding the contract method 0x9c89a0e2.
-//
-// Solidity: function getReputation(address _address) view returns(uint256)
-func (_Reputation *ReputationCallerSession) GetReputation(_address common.Address) (*big.Int, error) {
-	return _Reputation.Contract.GetReputation(&_Reputation.CallOpts, _address)
-}
-
-// UpdateReputation is a paid mutator transaction binding the contract method 0x6a08b511.
-//
-// Solidity: function updateReputation(address _address, int256 _score) returns()
-func (_Reputation *ReputationTransactor) UpdateReputation(opts *bind.TransactOpts, _address common.Address, _score *big.Int) (*types.Transaction, error) {
-	return _Reputation.contract.Transact(opts, "updateReputation", _address, _score)
-}
-
-// UpdateReputation is a paid mutator transaction binding the contract method 0x6a08b511.
-//
-// Solidity: function updateReputation(address _address, int256 _score) returns()
-func (_Reputation *ReputationSession) UpdateReputation(_address common.Address, _score *big.Int) (*types.Transaction, error) {
-	return _Reputation.Contract.UpdateReputation(&_Reputation.TransactOpts, _address, _score)
-}
-
-// UpdateReputation is a paid mutator transaction binding the contract method 0x6a08b511.
-//
-// Solidity: function updateReputation(address _address, int256 _score) returns()
-func (_Reputation *ReputationTransactorSession) UpdateReputation(_address common.Address, _score *big.Int) (*types.Transaction, error) {
-	return _Reputation.Contract.UpdateReputation(&_Reputation.TransactOpts, _address, _score)
-}
-
-// SafeMathMetaData contains all meta data concerning the SafeMath contract.
-var SafeMathMetaData = &bind.MetaData{
-	ABI: "[]",
-	Bin: "0x607b6037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea2646970667358221220df10cb82dc6935b57f6eda10534b9d22720394adbcc0e91292808dd99700a23d64736f6c637827302e382e31392d646576656c6f702e323032332e332e372b636f6d6d69742e37646436643430340058",
-}
-
-// SafeMathABI is the input ABI used to generate the binding from.
-// Deprecated: Use SafeMathMetaData.ABI instead.
-var SafeMathABI = SafeMathMetaData.ABI
-
-// SafeMathBin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use SafeMathMetaData.Bin instead.
-var SafeMathBin = SafeMathMetaData.Bin
-
-// DeploySafeMath deploys a new Ethereum contract, binding an instance of SafeMath to it.
-func DeploySafeMath(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *SafeMath, error) {
-	parsed, err := SafeMathMetaData.GetAbi()
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	if parsed == nil {
-		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(SafeMathBin), backend)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &SafeMath{SafeMathCaller: SafeMathCaller{contract: contract}, SafeMathTransactor: SafeMathTransactor{contract: contract}, SafeMathFilterer: SafeMathFilterer{contract: contract}}, nil
-}
-
-// SafeMath is an auto generated Go binding around an Ethereum contract.
-type SafeMath struct {
-	SafeMathCaller     // Read-only binding to the contract
-	SafeMathTransactor // Write-only binding to the contract
-	SafeMathFilterer   // Log filterer for contract events
-}
-
-// SafeMathCaller is an auto generated read-only Go binding around an Ethereum contract.
-type SafeMathCaller struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// SafeMathTransactor is an auto generated write-only Go binding around an Ethereum contract.
-type SafeMathTransactor struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// SafeMathFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
-type SafeMathFilterer struct {
-	contract *bind.BoundContract // Generic contract wrapper for the low level calls
-}
-
-// SafeMathSession is an auto generated Go binding around an Ethereum contract,
-// with pre-set call and transact options.
-type SafeMathSession struct {
-	Contract     *SafeMath         // Generic contract binding to set the session for
-	CallOpts     bind.CallOpts     // Call options to use throughout this session
-	TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
-}
-
-// SafeMathCallerSession is an auto generated read-only Go binding around an Ethereum contract,
-// with pre-set call options.
-type SafeMathCallerSession struct {
-	Contract *SafeMathCaller // Generic contract caller binding to set the session for
+type RepValueCallerSession struct {
+	Contract *RepValueCaller // Generic contract caller binding to set the session for
 	CallOpts bind.CallOpts   // Call options to use throughout this session
 }
 
-// SafeMathTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
+// RepValueTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
 // with pre-set transact options.
-type SafeMathTransactorSession struct {
-	Contract     *SafeMathTransactor // Generic contract transactor binding to set the session for
+type RepValueTransactorSession struct {
+	Contract     *RepValueTransactor // Generic contract transactor binding to set the session for
 	TransactOpts bind.TransactOpts   // Transaction auth options to use throughout this session
 }
 
-// SafeMathRaw is an auto generated low-level Go binding around an Ethereum contract.
-type SafeMathRaw struct {
-	Contract *SafeMath // Generic contract binding to access the raw methods on
+// RepValueRaw is an auto generated low-level Go binding around an Ethereum contract.
+type RepValueRaw struct {
+	Contract *RepValue // Generic contract binding to access the raw methods on
 }
 
-// SafeMathCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
-type SafeMathCallerRaw struct {
-	Contract *SafeMathCaller // Generic read-only contract binding to access the raw methods on
+// RepValueCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
+type RepValueCallerRaw struct {
+	Contract *RepValueCaller // Generic read-only contract binding to access the raw methods on
 }
 
-// SafeMathTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
-type SafeMathTransactorRaw struct {
-	Contract *SafeMathTransactor // Generic write-only contract binding to access the raw methods on
+// RepValueTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
+type RepValueTransactorRaw struct {
+	Contract *RepValueTransactor // Generic write-only contract binding to access the raw methods on
 }
 
-// NewSafeMath creates a new instance of SafeMath, bound to a specific deployed contract.
-func NewSafeMath(address common.Address, backend bind.ContractBackend) (*SafeMath, error) {
-	contract, err := bindSafeMath(address, backend, backend, backend)
+// NewRepValue creates a new instance of RepValue, bound to a specific deployed contract.
+func NewRepValue(address common.Address, backend bind.ContractBackend) (*RepValue, error) {
+	contract, err := bindRepValue(address, backend, backend, backend)
 	if err != nil {
 		return nil, err
 	}
-	return &SafeMath{SafeMathCaller: SafeMathCaller{contract: contract}, SafeMathTransactor: SafeMathTransactor{contract: contract}, SafeMathFilterer: SafeMathFilterer{contract: contract}}, nil
+	return &RepValue{RepValueCaller: RepValueCaller{contract: contract}, RepValueTransactor: RepValueTransactor{contract: contract}, RepValueFilterer: RepValueFilterer{contract: contract}}, nil
 }
 
-// NewSafeMathCaller creates a new read-only instance of SafeMath, bound to a specific deployed contract.
-func NewSafeMathCaller(address common.Address, caller bind.ContractCaller) (*SafeMathCaller, error) {
-	contract, err := bindSafeMath(address, caller, nil, nil)
+// NewRepValueCaller creates a new read-only instance of RepValue, bound to a specific deployed contract.
+func NewRepValueCaller(address common.Address, caller bind.ContractCaller) (*RepValueCaller, error) {
+	contract, err := bindRepValue(address, caller, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &SafeMathCaller{contract: contract}, nil
+	return &RepValueCaller{contract: contract}, nil
 }
 
-// NewSafeMathTransactor creates a new write-only instance of SafeMath, bound to a specific deployed contract.
-func NewSafeMathTransactor(address common.Address, transactor bind.ContractTransactor) (*SafeMathTransactor, error) {
-	contract, err := bindSafeMath(address, nil, transactor, nil)
+// NewRepValueTransactor creates a new write-only instance of RepValue, bound to a specific deployed contract.
+func NewRepValueTransactor(address common.Address, transactor bind.ContractTransactor) (*RepValueTransactor, error) {
+	contract, err := bindRepValue(address, nil, transactor, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &SafeMathTransactor{contract: contract}, nil
+	return &RepValueTransactor{contract: contract}, nil
 }
 
-// NewSafeMathFilterer creates a new log filterer instance of SafeMath, bound to a specific deployed contract.
-func NewSafeMathFilterer(address common.Address, filterer bind.ContractFilterer) (*SafeMathFilterer, error) {
-	contract, err := bindSafeMath(address, nil, nil, filterer)
+// NewRepValueFilterer creates a new log filterer instance of RepValue, bound to a specific deployed contract.
+func NewRepValueFilterer(address common.Address, filterer bind.ContractFilterer) (*RepValueFilterer, error) {
+	contract, err := bindRepValue(address, nil, nil, filterer)
 	if err != nil {
 		return nil, err
 	}
-	return &SafeMathFilterer{contract: contract}, nil
+	return &RepValueFilterer{contract: contract}, nil
 }
 
-// bindSafeMath binds a generic wrapper to an already deployed contract.
-func bindSafeMath(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := abi.JSON(strings.NewReader(SafeMathABI))
+// bindRepValue binds a generic wrapper to an already deployed contract.
+func bindRepValue(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := abi.JSON(strings.NewReader(RepValueABI))
 	if err != nil {
 		return nil, err
 	}
@@ -778,38 +522,121 @@ func bindSafeMath(address common.Address, caller bind.ContractCaller, transactor
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_SafeMath *SafeMathRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _SafeMath.Contract.SafeMathCaller.contract.Call(opts, result, method, params...)
+func (_RepValue *RepValueRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _RepValue.Contract.RepValueCaller.contract.Call(opts, result, method, params...)
 }
 
 // Transfer initiates a plain transaction to move funds to the contract, calling
 // its default method if one is available.
-func (_SafeMath *SafeMathRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _SafeMath.Contract.SafeMathTransactor.contract.Transfer(opts)
+func (_RepValue *RepValueRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _RepValue.Contract.RepValueTransactor.contract.Transfer(opts)
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_SafeMath *SafeMathRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _SafeMath.Contract.SafeMathTransactor.contract.Transact(opts, method, params...)
+func (_RepValue *RepValueRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _RepValue.Contract.RepValueTransactor.contract.Transact(opts, method, params...)
 }
 
 // Call invokes the (constant) contract method with params as input values and
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_SafeMath *SafeMathCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _SafeMath.Contract.contract.Call(opts, result, method, params...)
+func (_RepValue *RepValueCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _RepValue.Contract.contract.Call(opts, result, method, params...)
 }
 
 // Transfer initiates a plain transaction to move funds to the contract, calling
 // its default method if one is available.
-func (_SafeMath *SafeMathTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _SafeMath.Contract.contract.Transfer(opts)
+func (_RepValue *RepValueTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _RepValue.Contract.contract.Transfer(opts)
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_SafeMath *SafeMathTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _SafeMath.Contract.contract.Transact(opts, method, params...)
+func (_RepValue *RepValueTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _RepValue.Contract.contract.Transact(opts, method, params...)
+}
+
+// GetRepThreshold is a free data retrieval call binding the contract method 0xef4165f2.
+//
+// Solidity: function getRepThreshold() view returns(uint256)
+func (_RepValue *RepValueCaller) GetRepThreshold(opts *bind.CallOpts) (*big.Int, error) {
+	var out []interface{}
+	err := _RepValue.contract.Call(opts, &out, "getRepThreshold")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetRepThreshold is a free data retrieval call binding the contract method 0xef4165f2.
+//
+// Solidity: function getRepThreshold() view returns(uint256)
+func (_RepValue *RepValueSession) GetRepThreshold() (*big.Int, error) {
+	return _RepValue.Contract.GetRepThreshold(&_RepValue.CallOpts)
+}
+
+// GetRepThreshold is a free data retrieval call binding the contract method 0xef4165f2.
+//
+// Solidity: function getRepThreshold() view returns(uint256)
+func (_RepValue *RepValueCallerSession) GetRepThreshold() (*big.Int, error) {
+	return _RepValue.Contract.GetRepThreshold(&_RepValue.CallOpts)
+}
+
+// GetReputation is a free data retrieval call binding the contract method 0x9c89a0e2.
+//
+// Solidity: function getReputation(address account) view returns(uint256)
+func (_RepValue *RepValueCaller) GetReputation(opts *bind.CallOpts, account common.Address) (*big.Int, error) {
+	var out []interface{}
+	err := _RepValue.contract.Call(opts, &out, "getReputation", account)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetReputation is a free data retrieval call binding the contract method 0x9c89a0e2.
+//
+// Solidity: function getReputation(address account) view returns(uint256)
+func (_RepValue *RepValueSession) GetReputation(account common.Address) (*big.Int, error) {
+	return _RepValue.Contract.GetReputation(&_RepValue.CallOpts, account)
+}
+
+// GetReputation is a free data retrieval call binding the contract method 0x9c89a0e2.
+//
+// Solidity: function getReputation(address account) view returns(uint256)
+func (_RepValue *RepValueCallerSession) GetReputation(account common.Address) (*big.Int, error) {
+	return _RepValue.Contract.GetReputation(&_RepValue.CallOpts, account)
+}
+
+// UpdateReputation is a paid mutator transaction binding the contract method 0x6a08b511.
+//
+// Solidity: function updateReputation(address account, int256 reward) returns()
+func (_RepValue *RepValueTransactor) UpdateReputation(opts *bind.TransactOpts, account common.Address, reward *big.Int) (*types.Transaction, error) {
+	return _RepValue.contract.Transact(opts, "updateReputation", account, reward)
+}
+
+// UpdateReputation is a paid mutator transaction binding the contract method 0x6a08b511.
+//
+// Solidity: function updateReputation(address account, int256 reward) returns()
+func (_RepValue *RepValueSession) UpdateReputation(account common.Address, reward *big.Int) (*types.Transaction, error) {
+	return _RepValue.Contract.UpdateReputation(&_RepValue.TransactOpts, account, reward)
+}
+
+// UpdateReputation is a paid mutator transaction binding the contract method 0x6a08b511.
+//
+// Solidity: function updateReputation(address account, int256 reward) returns()
+func (_RepValue *RepValueTransactorSession) UpdateReputation(account common.Address, reward *big.Int) (*types.Transaction, error) {
+	return _RepValue.Contract.UpdateReputation(&_RepValue.TransactOpts, account, reward)
 }
 
 // SignedMathMetaData contains all meta data concerning the SignedMath contract.
