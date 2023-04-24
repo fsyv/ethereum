@@ -406,6 +406,11 @@ func (s *Ethereum) shouldPreserve(header *types.Header) bool {
 	if _, ok := s.engine.(*clique.Clique); ok {
 		return false
 	}
+
+	if _, ok := s.engine.(*repvm.Repvm); ok {
+		return false
+	}
+
 	return s.isLocalBlock(header)
 }
 

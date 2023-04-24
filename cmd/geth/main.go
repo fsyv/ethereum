@@ -435,8 +435,8 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 		}()
 	}
 
-	// 绑定信誉管理的智能
-	stack.BindContract(backend, ethClient)
+	// 绑定调用智能合约的账户
+	stack.BindAccount(ethClient)
 
 	// Start auxiliary services if enabled
 	if ctx.Bool(utils.MiningEnabledFlag.Name) || ctx.Bool(utils.DeveloperFlag.Name) {

@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/internal/flags"
 	"github.com/ethereum/go-ethereum/log"
@@ -163,6 +164,15 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 		override := ctx.Bool(utils.OverrideTerminalTotalDifficultyPassed.Name)
 		cfg.Eth.OverrideTerminalTotalDifficultyPassed = &override
 	}
+
+	// Create a client to interact with local geth node.
+	rpcClient, err := stack.Attach()
+	if err != nil {
+		utils.Fatalf("Failed to attach to self: %v", err)
+	}
+	ethClient := ethclient.NewClient(rpcClient)
+	// 绑定信誉管理的智能合约
+	stack.BindContract(ethClient)
 
 	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
 

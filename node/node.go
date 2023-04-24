@@ -20,10 +20,6 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"hash/crc32"
 	"net/http"
 	"os"
@@ -31,6 +27,10 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -784,7 +784,11 @@ func (n *Node) Reputation() *reputation.Reputation {
 	return n.rep
 }
 
-func (n *Node) BindContract(backend ethapi.Backend, client *ethclient.Client) error {
+func (n *Node) BindContract(client *ethclient.Client) error {
+	return n.rep.BindContract(client, common.HexToAddress(reputation.ReputationAccount))
+}
+
+func (n *Node) BindAccount(client *ethclient.Client) error {
 	// 解锁对应账户
 	ks := n.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 
@@ -798,7 +802,5 @@ func (n *Node) BindContract(backend ethapi.Backend, client *ethclient.Client) er
 		return err
 	}
 
-	_, err = reputation.DeployContract(client, common.Bytes2Hex(crypto.FromECDSA(key.PrivateKey)))
-
-	return n.rep.BindContract(client, common.Bytes2Hex(crypto.FromECDSA(key.PrivateKey)), common.HexToAddress(reputation.ReputationAccount))
+	return n.rep.BindAccount(client, common.Bytes2Hex(crypto.FromECDSA(key.PrivateKey)))
 }

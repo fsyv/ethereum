@@ -61,8 +61,7 @@ var (
 	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	extraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
 
-	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
-	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
+	nonceChangeAuthorization = hexutil.MustDecode("0x0000000000000001") // 授权节点变更
 
 	uncleHash = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
 
@@ -262,16 +261,6 @@ func (r *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
 	checkpoint := (number % r.config.Epoch) == 0
-	if checkpoint && header.Coinbase != (common.Address{}) {
-		return errInvalidCheckpointBeneficiary
-	}
-	// Nonces must be 0x00..0 or 0xff..f, zeroes enforced on checkpoints
-	if !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
-		return errInvalidVote
-	}
-	if checkpoint && !bytes.Equal(header.Nonce[:], nonceDropVote) {
-		return errInvalidCheckpointVote
-	}
 	// Check that the extra-data contains both the vanity and signature
 	if len(header.Extra) < extraVanity {
 		return errMissingVanity
@@ -300,7 +289,7 @@ func (r *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
 	// and cannot be a negative number
 	if number > 0 {
-		if header.Difficulty == nil || header.Difficulty.Cmp(big.NewInt(0)) < 0 {
+		if header.Difficulty == nil || header.Difficulty.Cmp(big.NewInt(1)) < 0 {
 			return errInvalidDifficulty
 		}
 	}
@@ -339,40 +328,9 @@ func (r *Repvm) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	if parent.Time+r.config.Period > header.Time {
 		return errInvalidTimestamp
 	}
-	// Verify that the gasUsed is <= gasLimit
-	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
-	}
-	if !chain.Config().IsLondon(header.Number) {
-		// Verify BaseFee not present before EIP-1559 fork.
-		if header.BaseFee != nil {
-			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
-		}
-		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
-			return err
-		}
-	} else if err := misc.VerifyEip1559Header(chain.Config(), parent, header); err != nil {
-		// Verify the header's EIP-1559 attributes.
-		return err
-	}
-	// Retrieve the snapshot needed to verify this header and cache it
-	snap, err := r.snapshot(chain, number-1, header.ParentHash, parents)
-	if err != nil {
-		return err
-	}
-	// If the block is a checkpoint block, verify the signer list
-	if number%r.config.Epoch == 0 {
-		signers := make([]byte, len(snap.Signers)*common.AddressLength)
-		for i, signer := range snap.signers() {
-			copy(signers[i*common.AddressLength:], signer[:])
-		}
-		extraSuffix := len(header.Extra) - extraSeal
-		if !bytes.Equal(header.Extra[extraVanity:extraSuffix], signers) {
-			return errMismatchingCheckpointSigners
-		}
-	}
+
 	// All basic checks passed, verify the seal and return
-	return r.verifySeal(snap, header, parents)
+	return r.verifySeal(chain, header, parents)
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
@@ -440,7 +398,7 @@ func (r *Repvm) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 	for i := 0; i < len(headers)/2; i++ {
 		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
 	}
-	snap, err := snap.apply(headers, r.rep)
+	snap, err := snap.apply(headers)
 	if err != nil {
 		return nil, err
 	}
@@ -469,12 +427,18 @@ func (r *Repvm) VerifyUncles(chain consensus.ChainReader, block *types.Block) er
 // consensus protocol requirements. The method accepts an optional list of parent
 // headers that aren't yet part of the local blockchain to generate the snapshots
 // from.
-func (r *Repvm) verifySeal(snap *Snapshot, header *types.Header, parents []*types.Header) error {
+func (r *Repvm) verifySeal(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) error {
 	// Verifying the genesis block is not supported
 	number := header.Number.Uint64()
 	if number == 0 {
 		return errUnknownBlock
 	}
+	// Retrieve the snapshot needed to verify this header and cache it
+	snap, err := r.snapshot(chain, number-1, header.ParentHash, parents)
+	if err != nil {
+		return err
+	}
+
 	// Resolve the authorization key and check against signers
 	signer, err := ecrecover(header, r.signatures)
 	if err != nil {
@@ -495,12 +459,8 @@ func (r *Repvm) verifySeal(snap *Snapshot, header *types.Header, parents []*type
 	// TODO: 逻辑一样，不过变成检验难度是否和信誉值相同
 	if !r.fakeDiff {
 
-		rep, err := r.rep.GetReputation(signer)
-		if err != nil {
-			return errContract
-		}
-
-		if header.Difficulty.Cmp(rep) != 0 {
+		// 难度最小为1
+		if header.Difficulty.Cmp(big.NewInt(1)) < 0 {
 			return errWrongDifficulty
 		}
 	}
@@ -520,33 +480,10 @@ func (r *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	if err != nil {
 		return err
 	}
-	r.lock.RLock()
-	if number%r.config.Epoch != 0 {
-		// Gather all the proposals that make sense voting on
-		addresses := make([]common.Address, 0, len(r.proposals))
-		for address, authorize := range r.proposals {
-			if snap.validVote(address, authorize) {
-				addresses = append(addresses, address)
-			}
-		}
-		// If there's pending proposals, cast a vote on them
-		if len(addresses) > 0 {
-			header.Coinbase = addresses[rand.Intn(len(addresses))]
-			if r.proposals[header.Coinbase] {
-				copy(header.Nonce[:], nonceAuthVote)
-			} else {
-				copy(header.Nonce[:], nonceDropVote)
-			}
-		}
-	}
-
-	// Copy signer protected by mutex to avoid race condition
-	signer := r.signer
-	r.lock.RUnlock()
 
 	// Set the correct difficulty
-	// TODO: 返回的信誉值
-	header.Difficulty, err = r.rep.GetReputation(signer)
+	// 获取节点的信誉值
+	header.Difficulty, err = r.rep.GetReputation(r.signer)
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
@@ -555,8 +492,21 @@ func (r *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	header.Extra = header.Extra[:extraVanity]
 
 	if number%r.config.Epoch == 0 {
-		for _, signer := range snap.signers() {
-			header.Extra = append(header.Extra, signer[:]...)
+
+		// 更新Signers，如果授权节点中的信誉值小于阈值，则被剔除
+		signers, err := r.rep.GetSigners()
+		if err == nil {
+
+			for _, signer := range signers {
+				header.Extra = append(header.Extra, signer[:]...)
+			}
+
+			// 这一个授权节点变更的消息
+			copy(header.Nonce[:], nonceChangeAuthorization)
+		} else {
+			for _, signer := range snap.signers() {
+				header.Extra = append(header.Extra, signer[:]...)
+			}
 		}
 	}
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
@@ -623,6 +573,9 @@ func (r *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	signer, signFn := r.signer, r.signFn
 	r.lock.RUnlock()
 
+	// 注册本节点--保持活性
+	_, err := r.rep.RegisterAccount(signer)
+
 	// Bail out if we're unauthorized to sign a block
 	snap, err := r.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
@@ -643,17 +596,17 @@ func (r *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	}
 	// TODO: 根据信誉值规则添加延迟
 	//       1. 如果 reputation != maxRep, delay一段时间，即高信誉节点可以抢提交区块的权限
-	maxRep := big.NewInt(0)
+	maxRep := big.NewInt(1)
 	for _, signer := range snap.signers() {
-
-		if rep, _ := r.rep.GetReputation(signer); rep.Cmp(maxRep) > 0 {
+		if rep := getReputation(r.rep, signer); rep.Cmp(maxRep) > 0 {
 			maxRep = rep
 		}
 	}
 
 	// Sweet, the protocol permits us to sign the block, wait for our time
 	delay := time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
-	if header.Difficulty.Cmp(maxRep) == 0 {
+	// 如果信誉不是最高，则延迟出块
+	if header.Difficulty.Cmp(maxRep) != 0 {
 		// It's not our turn explicitly to sign, delay it a bit
 		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
 		delay += time.Duration(rand.Int63n(int64(wiggle)))
@@ -697,14 +650,27 @@ func (r *Repvm) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 	r.lock.RUnlock()
 
 	// 查询出块节点的信誉值
-	reputation, err := r.rep.GetReputation(signer)
+	return getReputation(r.rep, signer)
+}
 
-	if err != nil {
-		log.Error("信誉查询异常: ", err)
-		return big.NewInt(0)
+func getReputation(rep *reputation.Reputation, signer common.Address) *big.Int {
+
+	if rep == nil {
+		return big.NewInt(1)
 	}
 
-	return reputation
+	r, err := rep.GetReputation(signer)
+
+	if err != nil {
+		// 发生异常
+		log.Error("信誉查询异常: ", err)
+		return big.NewInt(1)
+	} else if r.Cmp(big.NewInt(1)) < 0 {
+		// 查询到的信誉小于1，赋值为1
+		return big.NewInt(1)
+	}
+
+	return r
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

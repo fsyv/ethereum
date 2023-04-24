@@ -4,10 +4,12 @@ package reputation
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -85,14 +87,7 @@ func DeployContract(client *ethclient.Client, privateKeyAddress string) (common.
 }
 
 // BindContract 绑定已经部署在区块链上的合约
-func (rep *Reputation) BindContract(client *ethclient.Client, privateKeyAddress string, contractAddress common.Address) error {
-
-	caller, err := rep.getCaller(client, privateKeyAddress)
-	if err != nil {
-		rep.log.Error("BindContract", "could not get caller may not update reputation", err)
-	}
-
-	rep.caller = caller
+func (rep *Reputation) BindContract(client *ethclient.Client, contractAddress common.Address) error {
 
 	contract, err := reputation.NewRepValue(contractAddress, client)
 	if err != nil {
@@ -101,6 +96,21 @@ func (rep *Reputation) BindContract(client *ethclient.Client, privateKeyAddress 
 	}
 
 	rep.contract = contract
+
+	return nil
+}
+
+// BindContract 绑定账户调用合约
+func (rep *Reputation) BindAccount(client *ethclient.Client, privateKeyAddress string) error {
+
+	caller, err := rep.getCaller(client, privateKeyAddress)
+	if err != nil {
+		rep.log.Error("BindContract", "could not get caller may not update reputation", err)
+
+		return err
+	}
+
+	rep.caller = caller
 
 	return nil
 }
@@ -117,10 +127,33 @@ func (rep *Reputation) GetRepThreshold() (*big.Int, error) {
 
 // UpdateReputation 更新信誉
 func (rep *Reputation) UpdateReputation(account common.Address, score *big.Int) (*types.Transaction, error) {
+
+	// 没绑定账户
+	if rep.caller == nil {
+		return nil, errors.New("must bind account first")
+	}
+
 	return rep.contract.UpdateReputation(rep.caller, account, score)
 }
 
+// RegisterAccount 注册本节点
+func (rep *Reputation) RegisterAccount(account common.Address) (*types.Transaction, error) {
+
+	// 没绑定账户
+	if rep.caller == nil {
+		return nil, errors.New("must bind account first")
+	}
+
+	return rep.contract.RegisterAccount(rep.caller, account)
+}
+
+// GetSigners 获取授权账户
+func (rep *Reputation) GetSigners() ([]common.Address, error) {
+	return rep.contract.GetSigners(nil)
+}
+
 func (rep *Reputation) getCaller(client *ethclient.Client, privateKeyAddress string) (*bind.TransactOpts, error) {
+
 	privateKey, err := crypto.HexToECDSA(privateKeyAddress)
 	if err != nil {
 		rep.log.Warn("getCaller", "HexToECDSA", err)
@@ -155,7 +188,7 @@ func (rep *Reputation) getCaller(client *ethclient.Client, privateKeyAddress str
 		return nil, err
 	}
 
-	caller.Nonce = big.NewInt(int64(nonce))
+	//caller.Nonce = big.NewInt(int64(nonce))
 	caller.Value = big.NewInt(0)      // in wei
 	caller.GasLimit = uint64(3000000) // in units
 	caller.GasPrice = big.NewInt(1000000000)

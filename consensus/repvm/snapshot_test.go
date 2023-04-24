@@ -411,7 +411,7 @@ func TestRepvm(t *testing.T) {
 			Period: 1,
 			Epoch:  tt.epoch,
 		}
-		engine := New(config.Repvm, db)
+		engine := New(config.Repvm, db, nil)
 		engine.fakeDiff = true
 
 		blocks, _ := core.GenerateChain(&config, genesisBlock, engine, db, len(tt.votes), func(j int, gen *core.BlockGen) {
@@ -419,7 +419,7 @@ func TestRepvm(t *testing.T) {
 			gen.SetCoinbase(accounts.address(tt.votes[j].voted))
 			if tt.votes[j].auth {
 				var nonce types.BlockNonce
-				copy(nonce[:], nonceAuthVote)
+				//copy(nonce[:], nonceAuthVote)
 				gen.SetNonce(nonce)
 			}
 		})

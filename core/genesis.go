@@ -415,6 +415,10 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	if config.Clique != nil && len(block.Extra()) < 32+crypto.SignatureLength {
 		return nil, errors.New("can't start clique chain without signers")
 	}
+
+	if config.Repvm != nil && len(block.Extra()) < 32+crypto.SignatureLength {
+		return nil, errors.New("can't start repvm chain without signers")
+	}
 	// All the checks has passed, flush the states derived from the genesis
 	// specification as well as the specification itself into the provided
 	// database.
