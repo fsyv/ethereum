@@ -260,7 +260,7 @@ func (r *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return consensus.ErrFutureBlock
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
-	checkpoint := (number % r.config.Epoch) == 0
+	checkpoint := bytes.Equal(header.Nonce[:], nonceChangeAuthorization)
 	// Check that the extra-data contains both the vanity and signature
 	if len(header.Extra) < extraVanity {
 		return errMissingVanity

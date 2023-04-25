@@ -164,7 +164,8 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 
 			// Clear out all signers, readd the list of `signer` and `recent`
 			snap.Signers = make(map[common.Address]struct{})
-			snap.Recents = make(map[uint64]common.Address)
+			//snap.Recents = make(map[uint64]common.Address)
+			// 校验时候应该从智能合约中取
 			for j := 0; j < signersBytes/common.AddressLength; j++ {
 				newSigner := make([]byte, common.AddressLength)
 				copy(newSigner, header.Extra[extraVanity+j*common.AddressLength:])
