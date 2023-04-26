@@ -260,7 +260,7 @@ func (r *Repvm) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return consensus.ErrFutureBlock
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
-	checkpoint := bytes.Equal(header.Nonce[:], nonceChangeAuthorization)
+	checkpoint := (number % r.config.Epoch) == 0
 	// Check that the extra-data contains both the vanity and signature
 	if len(header.Extra) < extraVanity {
 		return errMissingVanity
@@ -476,7 +476,7 @@ func (r *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 	number := header.Number.Uint64()
 	// Assemble the voting snapshot to check which votes make sense
-	snap, err := r.snapshot(chain, number-1, header.ParentHash, nil)
+	_, err := r.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
 		return err
 	}
@@ -495,7 +495,7 @@ func (r *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 		// 更新Signers，如果授权节点中的信誉值小于阈值，则被剔除
 		signers, err := r.rep.GetSigners()
-		if err == nil {
+		if err == nil && len(signers) > 0 {
 
 			for _, signer := range signers {
 				header.Extra = append(header.Extra, signer[:]...)
@@ -503,11 +503,12 @@ func (r *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 			// 这一个授权节点变更的消息
 			copy(header.Nonce[:], nonceChangeAuthorization)
-		} else {
-			for _, signer := range snap.signers() {
-				header.Extra = append(header.Extra, signer[:]...)
-			}
 		}
+		//else {
+		//	for _, signer := range snap.signers() {
+		//		header.Extra = append(header.Extra, signer[:]...)
+		//	}
+		//}
 	}
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
 
@@ -573,8 +574,8 @@ func (r *Repvm) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	signer, signFn := r.signer, r.signFn
 	r.lock.RUnlock()
 
-	// 注册本节点--保持活性
-	_, err := r.rep.RegisterAccount(signer)
+	//// 注册本节点--保持活性
+	//_, err := r.rep.RegisterAccount(signer)
 
 	// Bail out if we're unauthorized to sign a block
 	snap, err := r.snapshot(chain, number-1, header.ParentHash, nil)

@@ -113,16 +113,28 @@ contract RepValue {
         // return signers;
 
         uint256 threshold = getRepThreshold();
-        address[] memory addresses = new address[](_active.length());
+        address[] memory addresses = new address[](_reputation.length());
 
         uint256 address_i = 0;
-        for (uint256 i = 0; i < _active.length(); i++) {
+//        for (uint256 i = 0; i < _active.length(); i++) {
+//            // 活动信誉值
+//            // (address account, uint256 number) = _active.at(i);
+//            (address account, ) = _active.at(i);
+//            // 统计信誉值大于threshold的节点 且最近活跃的节点
+//            // if (block.number - number < 10 && _reputation.get(account) >= threshold) {
+//            if (_reputation.get(account) >= threshold) {
+//                // signers.push(account);
+//                addresses[address_i++] = account;
+//            }
+//        }
+
+        for (uint256 i = 0; i < _reputation.length(); i++) {
             // 活动信誉值
             // (address account, uint256 number) = _active.at(i);
-            (address account, ) = _active.at(i);
+            (address account, uint256 rep) = _reputation.at(i);
             // 统计信誉值大于threshold的节点 且最近活跃的节点
             // if (block.number - number < 10 && _reputation.get(account) >= threshold) {
-            if (_reputation.get(account) >= threshold) {
+            if (rep >= threshold) {
                 // signers.push(account);
                 addresses[address_i++] = account;
             }
