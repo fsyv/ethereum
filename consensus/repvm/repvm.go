@@ -483,7 +483,7 @@ func (r *Repvm) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 	// Set the correct difficulty
 	// 获取节点的信誉值
-	header.Difficulty, err = r.rep.GetReputation(r.signer)
+	header.Difficulty = getReputation(r.rep, r.signer)
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
